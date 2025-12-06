@@ -26,7 +26,7 @@ Thanks to henkv1 for the original repo: https://github.com/henkv1/rtw88-usb-open
 - Update the package feeds: ./scripts/feeds update -a ; ./scripts/feeds install -a (see: https://openwrt.org/docs/guide-developer/toolchain/using_the_sdk for information on using the SDK)
 - Run make menuconfig.
 - Clone this repository on the folder package/kernel/rtw88.
-- There are two patches: for 23.05 and 24.10. Delete the file that you won't need.
+- There are two patches: for 23.05 and 24.10. Delete the file that you won't need. *This is not an optional step.*
 - (For SDK) Compile the package: make package/rtw88-usb/compile
 
 The firmware package is named rtw88-firmware{...} and you can find it in the bin/packages/{architecture}/base/ directory. 
