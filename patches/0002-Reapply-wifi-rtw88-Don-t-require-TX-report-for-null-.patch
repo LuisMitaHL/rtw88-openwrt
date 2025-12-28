@@ -13,11 +13,9 @@ This reverts commit 0ef5c8157a2d849ebd72cb26c2acc5934ca837f3.
  usb.c  |  2 +-
  5 files changed, 18 insertions(+), 4 deletions(-)
 
-diff --git a/pci.c b/pci.c
-index f348265..5bcba9e 100644
 --- a/pci.c
 +++ b/pci.c
-@@ -994,7 +994,7 @@ static void rtw_pci_tx_isr(struct rtw_dev *rtwdev, struct rtw_pci *rtwpci,
+@@ -1012,7 +1012,7 @@ static void rtw_pci_tx_isr(struct rtw_de
  		info = IEEE80211_SKB_CB(skb);
  
  		/* enqueue to wait for tx report */
@@ -26,11 +24,9 @@ index f348265..5bcba9e 100644
  			rtw_tx_report_enqueue(rtwdev, skb, tx_data->sn);
  			continue;
  		}
-diff --git a/sdio.c b/sdio.c
-index 579e0f6..95dd637 100644
 --- a/sdio.c
 +++ b/sdio.c
-@@ -1205,7 +1205,7 @@ static void rtw_sdio_indicate_tx_status(struct rtw_dev *rtwdev,
+@@ -1213,7 +1213,7 @@ static void rtw_sdio_indicate_tx_status(
  	skb_pull(skb, rtwdev->chip->tx_pkt_desc_sz);
  
  	/* enqueue to wait for tx report */
@@ -39,11 +35,9 @@ index 579e0f6..95dd637 100644
  		rtw_tx_report_enqueue(rtwdev, skb, tx_data->sn);
  		return;
  	}
-diff --git a/tx.c b/tx.c
-index 79c27a4..6bf5a4d 100644
 --- a/tx.c
 +++ b/tx.c
-@@ -216,6 +216,19 @@ void rtw_tx_report_purge_timer(void *cntx)
+@@ -219,6 +219,19 @@ void rtw_tx_report_purge_timer(void *cnt
  	spin_unlock_irqrestore(&tx_report->q_lock, flags);
  }
  
@@ -63,7 +57,7 @@ index 79c27a4..6bf5a4d 100644
  void rtw_tx_report_enqueue(struct rtw_dev *rtwdev, struct sk_buff *skb, u8 sn)
  {
  	struct rtw_tx_report *tx_report = &rtwdev->tx_report;
-@@ -466,7 +479,7 @@ void rtw_tx_pkt_info_update(struct rtw_dev *rtwdev,
+@@ -469,7 +482,7 @@ void rtw_tx_pkt_info_update(struct rtw_d
  	bmc = is_broadcast_ether_addr(hdr->addr1) ||
  	      is_multicast_ether_addr(hdr->addr1);
  
@@ -72,23 +66,19 @@ index 79c27a4..6bf5a4d 100644
  		rtw_tx_report_enable(rtwdev, pkt_info);
  
  	pkt_info->bmc = bmc;
-diff --git a/tx.h b/tx.h
-index d34cdec..978b006 100644
 --- a/tx.h
 +++ b/tx.h
-@@ -97,6 +97,7 @@ void rtw_tx_pkt_info_update(struct rtw_dev *rtwdev,
- 			    struct sk_buff *skb);
+@@ -103,6 +103,7 @@ void rtw_tx_pkt_info_update(struct rtw_d
  void rtw_tx_fill_tx_desc(struct rtw_dev *rtwdev,
- 			 struct rtw_tx_pkt_info *pkt_info, struct sk_buff *skb);
+ 			 struct rtw_tx_pkt_info *pkt_info,
+ 			 struct rtw_tx_desc *tx_desc);
 +bool rtw_tx_report_needed(struct rtw_dev *rtwdev, struct sk_buff *skb);
  void rtw_tx_report_enqueue(struct rtw_dev *rtwdev, struct sk_buff *skb, u8 sn);
  void rtw_tx_report_handle(struct rtw_dev *rtwdev, struct sk_buff *skb, int src);
  void rtw_tx_rsvd_page_pkt_info_update(struct rtw_dev *rtwdev,
-diff --git a/usb.c b/usb.c
-index 14b9230..f01cf87 100644
 --- a/usb.c
 +++ b/usb.c
-@@ -330,7 +330,7 @@ static void rtw_usb_write_port_tx_complete(struct urb *urb)
+@@ -336,7 +336,7 @@ static void rtw_usb_write_port_tx_comple
  		skb_pull(skb, rtwdev->chip->tx_pkt_desc_sz);
  
  		/* enqueue to wait for tx report */
@@ -97,6 +87,3 @@ index 14b9230..f01cf87 100644
  			rtw_tx_report_enqueue(rtwdev, skb, tx_data->sn);
  			continue;
  		}
--- 
-2.49.0
-

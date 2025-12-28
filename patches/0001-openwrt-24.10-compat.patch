@@ -1,8 +1,6 @@
-diff --git a/mac80211.c b/mac80211.c
-index f7c6e0a..694b327 100644
 --- a/mac80211.c
 +++ b/mac80211.c
-@@ -64,7 +64,7 @@ static int rtw_ops_start(struct ieee80211_hw *hw)
+@@ -64,7 +64,7 @@ static int rtw_ops_start(struct ieee8021
  	return ret;
  }
  
@@ -11,7 +9,7 @@ index f7c6e0a..694b327 100644
  static void rtw_ops_stop(struct ieee80211_hw *hw)
  #else
  static void rtw_ops_stop(struct ieee80211_hw *hw, bool suspend)
-@@ -1008,7 +1008,7 @@ static void rtw_ops_sta_rc_update(struct ieee80211_hw *hw,
+@@ -1028,7 +1028,7 @@ static void rtw_ops_sta_rc_update(struct
  }
  
  const struct ieee80211_ops rtw_ops = {
@@ -20,13 +18,11 @@ index f7c6e0a..694b327 100644
  	.add_chanctx = ieee80211_emulate_add_chanctx,
  	.remove_chanctx = ieee80211_emulate_remove_chanctx,
  	.change_chanctx = ieee80211_emulate_change_chanctx,
-diff --git a/main.h b/main.h
-index b2369e5..0653ff4 100644
 --- a/main.h
 +++ b/main.h
-@@ -36,7 +36,9 @@
- #define RHEL_RELEASE_VERSION(a, b) a<<8 & b
- #endif
+@@ -48,7 +48,9 @@ static inline void *devm_kmemdup_array(s
+ 
+ #define OPENWRT
  
 -#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0))
 +#define OPENWRT
@@ -35,7 +31,7 @@ index b2369e5..0653ff4 100644
  /**
   * abs_diff - return absolute value of the difference between the arguments
   * @a: the first argument
-@@ -57,7 +59,7 @@
+@@ -69,7 +71,7 @@ static inline void *devm_kmemdup_array(s
  })
  #endif
  
@@ -44,7 +40,7 @@ index b2369e5..0653ff4 100644
  /**
   * cfg80211_ssid_eq - compare two SSIDs
   * @a: first SSID
-@@ -2418,7 +2420,7 @@ bool rtw_core_check_sta_active(struct rtw_dev *rtwdev);
+@@ -2435,7 +2437,7 @@ bool rtw_core_check_sta_active(struct rt
  void rtw_core_enable_beacon(struct rtw_dev *rtwdev, bool enable);
  void rtw_set_ampdu_factor(struct rtw_dev *rtwdev, struct ieee80211_vif *vif,
  			  struct ieee80211_bss_conf *bss_conf);
@@ -53,11 +49,9 @@ index b2369e5..0653ff4 100644
  static inline bool rtw_ssid_equal(struct cfg80211_ssid *a,
                                   struct cfg80211_ssid *b)
  {
-diff --git a/pci.c b/pci.c
-index 8b0d961..f348265 100644
 --- a/pci.c
 +++ b/pci.c
-@@ -1617,7 +1617,7 @@ static const struct rtw_hci_ops rtw_pci_ops = {
+@@ -1641,7 +1641,7 @@ static const struct rtw_hci_ops rtw_pci_
  
  static int rtw_pci_request_irq(struct rtw_dev *rtwdev, struct pci_dev *pdev)
  {
@@ -66,7 +60,7 @@ index 8b0d961..f348265 100644
  	unsigned int flags = PCI_IRQ_INTX;
  #else
  	unsigned int flags = PCI_IRQ_LEGACY;
-@@ -1694,7 +1694,7 @@ static int rtw_pci_napi_init(struct rtw_dev *rtwdev)
+@@ -1720,7 +1720,7 @@ static int rtw_pci_napi_init(struct rtw_
  {
  	struct rtw_pci *rtwpci = (struct rtw_pci *)rtwdev->priv;
  
@@ -75,7 +69,7 @@ index 8b0d961..f348265 100644
  	rtwpci->netdev = alloc_netdev_dummy(0);
  	if (!rtwpci->netdev)
  		return -ENOMEM;
-@@ -1721,7 +1721,7 @@ static void rtw_pci_napi_deinit(struct rtw_dev *rtwdev)
+@@ -1747,7 +1747,7 @@ static void rtw_pci_napi_deinit(struct r
  
  	rtw_pci_napi_stop(rtwdev);
  	netif_napi_del(&rtwpci->napi);
@@ -84,11 +78,9 @@ index 8b0d961..f348265 100644
  	free_netdev(rtwpci->netdev);
  #endif
  }
-diff --git a/pci.h b/pci.h
-index c213448..5777ce5 100644
 --- a/pci.h
 +++ b/pci.h
-@@ -215,7 +215,7 @@ struct rtw_pci {
+@@ -244,7 +244,7 @@ struct rtw_pci {
  	bool running;
  
  	/* napi structure */

@@ -1,0 +1,64 @@
+--- a/mac80211.c
++++ b/mac80211.c
+@@ -77,7 +77,7 @@ static void rtw_ops_stop(struct ieee8021
+ 	mutex_unlock(&rtwdev->mutex);
+ }
+ 
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0) || defined(OPENWRT)
+ static int rtw_ops_config(struct ieee80211_hw *hw, int radio_idx, u32 changed)
+ #else
+ static int rtw_ops_config(struct ieee80211_hw *hw, u32 changed)
+@@ -770,7 +770,7 @@ static void rtw_ops_mgd_prepare_tx(struc
+ 	mutex_unlock(&rtwdev->mutex);
+ }
+ 
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0) || defined(OPENWRT)
+ static int rtw_ops_set_rts_threshold(struct ieee80211_hw *hw, int radio_idx,
+ 				     u32 value)
+ #else
+@@ -865,7 +865,7 @@ static int rtw_ops_set_bitrate_mask(stru
+ 
+ 
+ static int rtw_ops_set_antenna(struct ieee80211_hw *hw,
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0) || defined(OPENWRT)
+ 			       int radio_idx,
+ #endif
+ 			       u32 tx_antenna,
+@@ -890,7 +890,7 @@ static int rtw_ops_set_antenna(struct ie
+ }
+ 
+ static int rtw_ops_get_antenna(struct ieee80211_hw *hw,
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0) || defined(OPENWRT)
+ 			       int radio_idx,
+ #endif
+ 			       u32 *tx_antenna,
+@@ -1010,14 +1010,14 @@ static int rtw_ops_set_sar_specs(struct
+ 
+ static void rtw_ops_sta_rc_update(struct ieee80211_hw *hw,
+ 				  struct ieee80211_vif *vif,
+-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 13, 0)
++#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 13, 0) && !defined(OPENWRT)
+ 				  struct ieee80211_sta *sta, u32 changed)
+ #else
+ 				  struct ieee80211_link_sta *link_sta,
+ 				  u32 changed)
+ #endif
+ {
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0) || defined(OPENWRT)
+ 	struct ieee80211_sta *sta = link_sta->sta;
+ #endif
+ 	struct rtw_dev *rtwdev = hw->priv;
+@@ -1067,7 +1067,7 @@ const struct ieee80211_ops rtw_ops = {
+ 	.reconfig_complete	= rtw_reconfig_complete,
+ 	.hw_scan		= rtw_ops_hw_scan,
+ 	.cancel_hw_scan		= rtw_ops_cancel_hw_scan,
+-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 13, 0)
++#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 13, 0) && !defined(OPENWRT)
+ 	.sta_rc_update		= rtw_ops_sta_rc_update,
+ #else
+ 	.link_sta_rc_update	= rtw_ops_sta_rc_update,
