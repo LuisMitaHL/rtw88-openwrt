@@ -1,4 +1,11 @@
-compiles clean on an openwrt-sdk-25.12.2-mediatek-filogic_gcc-14.3.0_musl.Linux-x86_64
+compiles clean on an openwrt-sdk-25.12.(2-3)-mediatek-filogic_gcc-14.3.0_musl.Linux-x86_64
+
+for the SDK, you will need to issue the following before compiling the rtw88 package
+
+```
+./scripts/feeds update
+./scripts/feeds install mac80211
+```
 
 this is by far the best alternative package driver to the mainline openwrt series, at least for the >=25.12.2 releases
 
