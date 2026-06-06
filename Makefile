@@ -57,7 +57,7 @@ define KernelPackage/rtw88-backports-usb
 	$(PKG_BUILD_DIR)/rtw_8723d.ko \
 	$(PKG_BUILD_DIR)/rtw_8723x.ko \
 	$(PKG_BUILD_DIR)/rtw_8723du.ko
-  AUTOLOAD:=$(call AutoLoad,50,$(RTW_AUTOLOAD))
+  AUTOLOAD:=$(call AutoProbe,$(RTW_AUTOLOAD))
 endef
 
 NOSTDINC_FLAGS = \
