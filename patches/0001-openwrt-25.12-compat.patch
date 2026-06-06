@@ -1,0 +1,194 @@
+diff --git a/mac80211.c b/mac80211.c
+index 9e583b5..7151416 100644
+--- a/mac80211.c
++++ b/mac80211.c
+@@ -77,7 +77,7 @@ static void rtw_ops_stop(struct ieee80211_hw *hw, bool suspend)
+ 	mutex_unlock(&rtwdev->mutex);
+ }
+ 
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0) || defined(OPENWRT)
+ static int rtw_ops_config(struct ieee80211_hw *hw, int radio_idx, u32 changed)
+ #else
+ static int rtw_ops_config(struct ieee80211_hw *hw, u32 changed)
+@@ -776,7 +776,7 @@ static void rtw_ops_mgd_prepare_tx(struct ieee80211_hw *hw,
+ 	mutex_unlock(&rtwdev->mutex);
+ }
+ 
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0) || defined(OPENWRT)
+ static int rtw_ops_set_rts_threshold(struct ieee80211_hw *hw, int radio_idx,
+ 				     u32 value)
+ #else
+@@ -871,7 +871,7 @@ static int rtw_ops_set_bitrate_mask(struct ieee80211_hw *hw,
+ 
+ 
+ static int rtw_ops_set_antenna(struct ieee80211_hw *hw,
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0) || defined(OPENWRT)
+ 			       int radio_idx,
+ #endif
+ 			       u32 tx_antenna,
+@@ -885,7 +885,7 @@ static int rtw_ops_set_antenna(struct ieee80211_hw *hw,
+ 		return -EOPNOTSUPP;
+ 
+ 	mutex_lock(&rtwdev->mutex);
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0) || defined(OPENWRT)
+ 	ret = chip->ops->set_antenna(rtwdev, -1, tx_antenna, rx_antenna);
+ #else
+ 	ret = chip->ops->set_antenna(rtwdev, tx_antenna, rx_antenna);
+@@ -896,7 +896,7 @@ static int rtw_ops_set_antenna(struct ieee80211_hw *hw,
+ }
+ 
+ static int rtw_ops_get_antenna(struct ieee80211_hw *hw,
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0) || defined(OPENWRT)
+ 			       int radio_idx,
+ #endif
+ 			       u32 *tx_antenna,
+@@ -1016,14 +1016,14 @@ static int rtw_ops_set_sar_specs(struct ieee80211_hw *hw,
+ 
+ static void rtw_ops_sta_rc_update(struct ieee80211_hw *hw,
+ 				  struct ieee80211_vif *vif,
+-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 13, 0)
++#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 13, 0) && !defined(OPENWRT)
+ 				  struct ieee80211_sta *sta, u32 changed)
+ #else
+ 				  struct ieee80211_link_sta *link_sta,
+ 				  u32 changed)
+ #endif
+ {
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0) || defined(OPENWRT)
+ 	struct ieee80211_sta *sta = link_sta->sta;
+ #endif
+ 	struct rtw_dev *rtwdev = hw->priv;
+@@ -1073,7 +1073,7 @@ const struct ieee80211_ops rtw_ops = {
+ 	.reconfig_complete	= rtw_reconfig_complete,
+ 	.hw_scan		= rtw_ops_hw_scan,
+ 	.cancel_hw_scan		= rtw_ops_cancel_hw_scan,
+-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 13, 0)
++#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 13, 0) && !defined(OPENWRT)
+ 	.sta_rc_update		= rtw_ops_sta_rc_update,
+ #else
+ 	.link_sta_rc_update	= rtw_ops_sta_rc_update,
+diff --git a/main.h b/main.h
+index 3269533..755883e 100644
+--- a/main.h
++++ b/main.h
+@@ -36,7 +36,9 @@
+ #define RHEL_RELEASE_VERSION(a, b) a<<8 & b
+ #endif
+ 
+-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 12, 0)
++#define OPENWRT
++
++#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 12, 0) && !defined(OPENWRT)
+ /* Taken from kernel 6.18.1: include/linux/device/devres.h
+  * Removed size_dup(...) to support kernels older than 5.15. */
+ static inline void *devm_kmemdup_array(struct device *dev, const void *src,
+@@ -1028,7 +1030,7 @@ struct rtw_chip_ops {
+ 	int (*rsvd_page_dump)(struct rtw_dev *rtwdev, u8 *buf, u32 offset,
+ 			      u32 size);
+ 	int (*set_antenna)(struct rtw_dev *rtwdev,
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0) || defined(OPENWRT)
+ 			   int radio_idx,
+ #endif
+ 			   u32 antenna_tx,
+diff --git a/rtw8822b.c b/rtw8822b.c
+index a937d95..5e79eed 100644
+--- a/rtw8822b.c
++++ b/rtw8822b.c
+@@ -986,7 +986,7 @@ static bool rtw8822b_check_rf_path(u8 antenna)
+ }
+ 
+ static int rtw8822b_set_antenna(struct rtw_dev *rtwdev,
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0) || defined(OPENWRT)
+ 				int radio_idx,
+ #endif
+ 				u32 antenna_tx,
+diff --git a/rtw8822c.c b/rtw8822c.c
+index 737e3e2..1fac250 100644
+--- a/rtw8822c.c
++++ b/rtw8822c.c
+@@ -2770,7 +2770,7 @@ static void rtw8822c_set_tx_power_index(struct rtw_dev *rtwdev)
+ }
+ 
+ static int rtw8822c_set_antenna(struct rtw_dev *rtwdev,
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0) || defined(OPENWRT)
+ 				int radio_idx,
+ #endif
+ 				u32 antenna_tx,
+diff --git a/sdio.c b/sdio.c
+index 324921f..4915886 100644
+--- a/sdio.c
++++ b/sdio.c
+@@ -1317,7 +1317,7 @@ static void rtw_sdio_deinit_tx(struct rtw_dev *rtwdev)
+ 	struct rtw_sdio *rtwsdio = (struct rtw_sdio *)rtwdev->priv;
+ 	int i;
+ 
+-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 13, 0)
++#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 13, 0) && !defined(OPENWRT)
+ 	for (i = 0; i < RTK_MAX_TX_QUEUE_NUM; i++)
+ 		skb_queue_purge(&rtwsdio->tx_queue[i]);
+ #endif
+@@ -1325,7 +1325,7 @@ static void rtw_sdio_deinit_tx(struct rtw_dev *rtwdev)
+ 	destroy_workqueue(rtwsdio->txwq);
+ 	kfree(rtwsdio->tx_handler_data);
+ 
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0) || defined(OPENWRT)
+ 	for (i = 0; i < RTK_MAX_TX_QUEUE_NUM; i++)
+ 		ieee80211_purge_tx_queue(rtwdev->hw, &rtwsdio->tx_queue[i]);
+ #endif
+diff --git a/tx.c b/tx.c
+index e648816..a7dea0b 100644
+--- a/tx.c
++++ b/tx.c
+@@ -198,7 +198,7 @@ void rtw_tx_report_purge_timer(struct timer_list *t)
+ void rtw_tx_report_purge_timer(void *cntx)
+ #endif
+ {
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 16, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 16, 0) || defined(OPENWRT)
+ 	struct rtw_dev *rtwdev = timer_container_of(rtwdev, t,
+ 						    tx_report.purge_timer);
+ #elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
+diff --git a/usb.c b/usb.c
+index 95cd1db..d2b158d 100644
+--- a/usb.c
++++ b/usb.c
+@@ -482,13 +482,13 @@ static void rtw_usb_tx_handler(struct work_struct *work)
+ 
+ static void rtw_usb_tx_queue_purge(struct rtw_usb *rtwusb)
+ {
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0) || defined(OPENWRT)
+ 	struct rtw_dev *rtwdev = rtwusb->rtwdev;
+ #endif
+ 	int i;
+ 
+ 	for (i = 0; i < ARRAY_SIZE(rtwusb->tx_queue); i++)
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0) || defined(OPENWRT)
+ 		ieee80211_purge_tx_queue(rtwdev->hw, &rtwusb->tx_queue[i]);
+ #else
+ 		skb_queue_purge(&rtwusb->tx_queue[i]);
+@@ -1074,11 +1074,11 @@ static void rtw_usb_deinit_tx(struct rtw_dev *rtwdev)
+ {
+ 	struct rtw_usb *rtwusb = rtw_get_usb_priv(rtwdev);
+ 
+-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 13, 0)
++#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 13, 0) && !defined(OPENWRT)
+ 	rtw_usb_tx_queue_purge(rtwusb);
+ #endif
+ 	destroy_workqueue(rtwusb->txwq);
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0) || defined(OPENWRT)
+ 	rtw_usb_tx_queue_purge(rtwusb);
+ #endif
+ }
