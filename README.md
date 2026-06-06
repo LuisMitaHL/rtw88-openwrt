@@ -29,7 +29,7 @@ This is the most common case.
 - Clone this repository into the folder package/kernel/rtw88-backports: `git clone https://github.com/LuisMitaHL/rtw88-openwrt package/kernel/rtw88-backports`.
 - Run make defconfig.
 - There are three patches: for 23.05, 24.10 and 25.12. **Delete the patches for OpenWrt versions that you won't need**.
-- Compile the package: `make package/rtw88-usb/compile`. You can add ` -j$(nproc)` at the end for multi-core compiling.
+- Compile the package: `make package/rtw88-backports/compile`. You can add ` -j$(nproc)` at the end for multi-core compiling.
 
 If the build process works, you will find two files:
 - The firmware package is named rtw88-backports-firmware-*.apk and you can find it in the bin/packages/{architecture}/base/ directory. 
