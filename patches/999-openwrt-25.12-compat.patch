@@ -98,7 +98,7 @@ index 3269533..755883e 100644
  #endif
  			   u32 antenna_tx,
 diff --git a/rtw8822b.c b/rtw8822b.c
-index a937d95..5e79eed 100644
+index b28228a..09e8c18 100644
 --- a/rtw8822b.c
 +++ b/rtw8822b.c
 @@ -986,7 +986,7 @@ static bool rtw8822b_check_rf_path(u8 antenna)
@@ -111,7 +111,7 @@ index a937d95..5e79eed 100644
  #endif
  				u32 antenna_tx,
 diff --git a/rtw8822c.c b/rtw8822c.c
-index 737e3e2..1fac250 100644
+index d5c2a8b..73559cb 100644
 --- a/rtw8822c.c
 +++ b/rtw8822c.c
 @@ -2770,7 +2770,7 @@ static void rtw8822c_set_tx_power_index(struct rtw_dev *rtwdev)
