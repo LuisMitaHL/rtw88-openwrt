@@ -21,7 +21,7 @@ index a4f4121..ce221fb 100644
  #else
  		bfee->aid = bss_conf->aid;
 diff --git a/fw.c b/fw.c
-index 550afca..8f70e90 100644
+index 1281685..06b3672 100644
 --- a/fw.c
 +++ b/fw.c
 @@ -196,7 +196,7 @@ legacy:
@@ -79,7 +79,7 @@ index 550afca..8f70e90 100644
  #else
  		skb_new = ieee80211_nullfunc_get(hw, vif, true);
 diff --git a/fw.h b/fw.h
-index 54035ed..94440bb 100644
+index dfae7c3..4235326 100644
 --- a/fw.h
 +++ b/fw.h
 @@ -846,7 +846,7 @@ void rtw_fw_coex_query_hid_info(struct rtw_dev *rtwdev, u8 sub_id, u8 data);
@@ -92,10 +92,10 @@ index 54035ed..94440bb 100644
  			 bool reset_ra_mask);
  #else
 diff --git a/mac80211.c b/mac80211.c
-index 07ec50d..165f406 100644
+index 177a47a..97c9235 100644
 --- a/mac80211.c
 +++ b/mac80211.c
-@@ -388,7 +388,7 @@ static void rtw_conf_tx(struct rtw_dev *rtwdev,
+@@ -423,7 +423,7 @@ static void rtw_conf_tx(struct rtw_dev *rtwdev,
  static void rtw_ops_bss_info_changed(struct ieee80211_hw *hw,
  				     struct ieee80211_vif *vif,
  				     struct ieee80211_bss_conf *conf,
@@ -104,7 +104,7 @@ index 07ec50d..165f406 100644
  				     u64 changed)
  #else
  				     u32 changed)
-@@ -406,7 +406,7 @@ static void rtw_ops_bss_info_changed(struct ieee80211_hw *hw,
+@@ -441,7 +441,7 @@ static void rtw_ops_bss_info_changed(struct ieee80211_hw *hw,
  
  	if (changed & BSS_CHANGED_ASSOC) {
  		rtw_vif_assoc_changed(rtwvif, conf);
@@ -113,16 +113,16 @@ index 07ec50d..165f406 100644
  		if (vif->cfg.assoc) {
  #else
  		if (conf->assoc) {
-@@ -415,7 +415,7 @@ static void rtw_ops_bss_info_changed(struct ieee80211_hw *hw,
- 			rtw_fw_download_rsvd_page(rtwdev);
- 			rtw_send_rsvd_page_h2c(rtwdev);
+@@ -454,7 +454,7 @@ static void rtw_ops_bss_info_changed(struct ieee80211_hw *hw,
+ 				rtw_send_rsvd_page_h2c(rtwdev);
+ 			}
  			rtw_fw_default_port(rtwdev, rtwvif);
 -#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0))
 +#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)) || defined(OPENWRT)
  			rtw_coex_media_status_notify(rtwdev, vif->cfg.assoc);
  #else
  			rtw_coex_media_status_notify(rtwdev, conf->assoc);
-@@ -486,7 +486,7 @@ static void rtw_ops_bss_info_changed(struct ieee80211_hw *hw,
+@@ -533,7 +533,7 @@ static void rtw_ops_bss_info_changed(struct ieee80211_hw *hw,
  	mutex_unlock(&rtwdev->mutex);
  }
  
@@ -131,7 +131,7 @@ index 07ec50d..165f406 100644
  static int rtw_ops_start_ap(struct ieee80211_hw *hw,
  			    struct ieee80211_vif *vif,
  			    struct ieee80211_bss_conf *link_conf)
-@@ -508,7 +508,7 @@ static int rtw_ops_start_ap(struct ieee80211_hw *hw, struct ieee80211_vif *vif)
+@@ -555,7 +555,7 @@ static int rtw_ops_start_ap(struct ieee80211_hw *hw, struct ieee80211_vif *vif)
  	return 0;
  }
  
@@ -140,7 +140,7 @@ index 07ec50d..165f406 100644
  static void rtw_ops_stop_ap(struct ieee80211_hw *hw,
  			    struct ieee80211_vif *vif,
  			    struct ieee80211_bss_conf *link_conf)
-@@ -530,7 +530,7 @@ static void rtw_ops_stop_ap(struct ieee80211_hw *hw,
+@@ -578,7 +578,7 @@ static void rtw_ops_stop_ap(struct ieee80211_hw *hw,
  
  static int rtw_ops_conf_tx(struct ieee80211_hw *hw,
  			   struct ieee80211_vif *vif,
@@ -150,7 +150,7 @@ index 07ec50d..165f406 100644
  #else
  			   u16 ac,
 diff --git a/main.c b/main.c
-index 94b3b62..39173f5 100644
+index d856ddf..c66acd7 100644
 --- a/main.c
 +++ b/main.c
 @@ -194,7 +194,7 @@ static void rtw_vif_watch_dog_iter(void *data, struct ieee80211_vif *vif)
@@ -322,7 +322,7 @@ index 94b3b62..39173f5 100644
  	rtw_fw_send_ra_info(rtwdev, si, reset_ra_mask);
  #else
  	rtw_fw_send_ra_info(rtwdev, si);
-@@ -1820,7 +1820,7 @@ static void rtw_vif_smps_iter(void *data, u8 *mac,
+@@ -1830,7 +1830,7 @@ static void rtw_vif_smps_iter(void *data, u8 *mac,
  {
  	struct rtw_dev *rtwdev = (struct rtw_dev *)data;
  
@@ -331,7 +331,7 @@ index 94b3b62..39173f5 100644
  	if (vif->type != NL80211_IFTYPE_STATION || !vif->cfg.assoc)
  #else
  	if (vif->type != NL80211_IFTYPE_STATION || !vif->bss_conf.assoc)
-@@ -1828,13 +1828,13 @@ static void rtw_vif_smps_iter(void *data, u8 *mac,
+@@ -1838,13 +1838,13 @@ static void rtw_vif_smps_iter(void *data, u8 *mac,
  		return;
  
  	if (rtwdev->hal.txrx_1ss)
@@ -347,7 +347,7 @@ index 94b3b62..39173f5 100644
  		ieee80211_request_smps(vif, 0, IEEE80211_SMPS_OFF);
  #else
  		ieee80211_request_smps(vif, IEEE80211_SMPS_OFF);
-@@ -2569,7 +2569,7 @@ static void rtw_check_sta_active_iter(void *data, struct ieee80211_vif *vif)
+@@ -2584,7 +2584,7 @@ static void rtw_check_sta_active_iter(void *data, struct ieee80211_vif *vif)
  	if (vif->type != NL80211_IFTYPE_STATION)
  		return;
  
@@ -356,7 +356,7 @@ index 94b3b62..39173f5 100644
  	if (vif->cfg.assoc || !is_zero_ether_addr(rtwvif->bssid))
  #else
  	if (vif->bss_conf.assoc || !is_zero_ether_addr(rtwvif->bssid))
-@@ -2620,7 +2620,7 @@ void rtw_set_ampdu_factor(struct rtw_dev *rtwdev, struct ieee80211_vif *vif,
+@@ -2635,7 +2635,7 @@ void rtw_set_ampdu_factor(struct rtw_dev *rtwdev, struct ieee80211_vif *vif,
  		return;
  	}
  
@@ -366,7 +366,7 @@ index 94b3b62..39173f5 100644
  		factor = u32_get_bits(sta->deflink.vht_cap.cap,
  				      IEEE80211_VHT_CAP_MAX_A_MPDU_LENGTH_EXPONENT_MASK);
 diff --git a/main.h b/main.h
-index 3269533..67a7ef7 100644
+index 3c18647..d079329 100644
 --- a/main.h
 +++ b/main.h
 @@ -36,6 +36,8 @@

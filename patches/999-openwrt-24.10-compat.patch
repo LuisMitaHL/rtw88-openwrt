@@ -1,8 +1,8 @@
 diff --git a/mac80211.c b/mac80211.c
-index 07ec50d..d3068de 100644
+index 177a47a..1888b4d 100644
 --- a/mac80211.c
 +++ b/mac80211.c
-@@ -64,7 +64,7 @@ static int rtw_ops_start(struct ieee80211_hw *hw)
+@@ -76,7 +76,7 @@ static int rtw_ops_start(struct ieee80211_hw *hw)
  	return ret;
  }
  
@@ -11,7 +11,7 @@ index 07ec50d..d3068de 100644
  static void rtw_ops_stop(struct ieee80211_hw *hw)
  #else
  static void rtw_ops_stop(struct ieee80211_hw *hw, bool suspend)
-@@ -1036,7 +1036,7 @@ static void rtw_ops_sta_rc_update(struct ieee80211_hw *hw,
+@@ -1131,7 +1131,7 @@ static int rtw_ops_get_txpower(struct ieee80211_hw *hw,
  }
  
  const struct ieee80211_ops rtw_ops = {
@@ -21,7 +21,7 @@ index 07ec50d..d3068de 100644
  	.remove_chanctx = ieee80211_emulate_remove_chanctx,
  	.change_chanctx = ieee80211_emulate_change_chanctx,
 diff --git a/main.h b/main.h
-index 3269533..cd73565 100644
+index 3c18647..1639e63 100644
 --- a/main.h
 +++ b/main.h
 @@ -36,6 +36,8 @@
@@ -51,7 +51,7 @@ index 3269533..cd73565 100644
  /**
   * cfg80211_ssid_eq - compare two SSIDs
   * @a: first SSID
-@@ -2440,7 +2442,7 @@ bool rtw_core_check_sta_active(struct rtw_dev *rtwdev);
+@@ -2450,7 +2452,7 @@ bool rtw_core_check_sta_active(struct rtw_dev *rtwdev);
  void rtw_core_enable_beacon(struct rtw_dev *rtwdev, bool enable);
  void rtw_set_ampdu_factor(struct rtw_dev *rtwdev, struct ieee80211_vif *vif,
  			  struct ieee80211_bss_conf *bss_conf);
