@@ -92,7 +92,7 @@ index 54035ed..94440bb 100644
  			 bool reset_ra_mask);
  #else
 diff --git a/mac80211.c b/mac80211.c
-index 8f95e39..4d830b4 100644
+index 07ec50d..165f406 100644
 --- a/mac80211.c
 +++ b/mac80211.c
 @@ -388,7 +388,7 @@ static void rtw_conf_tx(struct rtw_dev *rtwdev,
@@ -131,7 +131,7 @@ index 8f95e39..4d830b4 100644
  static int rtw_ops_start_ap(struct ieee80211_hw *hw,
  			    struct ieee80211_vif *vif,
  			    struct ieee80211_bss_conf *link_conf)
-@@ -507,7 +507,7 @@ static int rtw_ops_start_ap(struct ieee80211_hw *hw, struct ieee80211_vif *vif)
+@@ -508,7 +508,7 @@ static int rtw_ops_start_ap(struct ieee80211_hw *hw, struct ieee80211_vif *vif)
  	return 0;
  }
  
@@ -140,7 +140,7 @@ index 8f95e39..4d830b4 100644
  static void rtw_ops_stop_ap(struct ieee80211_hw *hw,
  			    struct ieee80211_vif *vif,
  			    struct ieee80211_bss_conf *link_conf)
-@@ -528,7 +528,7 @@ static void rtw_ops_stop_ap(struct ieee80211_hw *hw,
+@@ -530,7 +530,7 @@ static void rtw_ops_stop_ap(struct ieee80211_hw *hw,
  
  static int rtw_ops_conf_tx(struct ieee80211_hw *hw,
  			   struct ieee80211_vif *vif,

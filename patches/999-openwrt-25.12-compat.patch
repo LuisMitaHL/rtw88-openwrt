@@ -1,5 +1,5 @@
 diff --git a/mac80211.c b/mac80211.c
-index 8f95e39..8dc2cc1 100644
+index 07ec50d..26de57e 100644
 --- a/mac80211.c
 +++ b/mac80211.c
 @@ -77,7 +77,7 @@ static void rtw_ops_stop(struct ieee80211_hw *hw, bool suspend)
@@ -11,7 +11,7 @@ index 8f95e39..8dc2cc1 100644
  static int rtw_ops_config(struct ieee80211_hw *hw, int radio_idx, u32 changed)
  #else
  static int rtw_ops_config(struct ieee80211_hw *hw, u32 changed)
-@@ -776,7 +776,7 @@ static void rtw_ops_mgd_prepare_tx(struct ieee80211_hw *hw,
+@@ -778,7 +778,7 @@ static void rtw_ops_mgd_prepare_tx(struct ieee80211_hw *hw,
  	mutex_unlock(&rtwdev->mutex);
  }
  
@@ -20,7 +20,7 @@ index 8f95e39..8dc2cc1 100644
  static int rtw_ops_set_rts_threshold(struct ieee80211_hw *hw, int radio_idx,
  				     u32 value)
  #else
-@@ -871,7 +871,7 @@ static int rtw_ops_set_bitrate_mask(struct ieee80211_hw *hw,
+@@ -873,7 +873,7 @@ static int rtw_ops_set_bitrate_mask(struct ieee80211_hw *hw,
  
  
  static int rtw_ops_set_antenna(struct ieee80211_hw *hw,
@@ -29,7 +29,7 @@ index 8f95e39..8dc2cc1 100644
  			       int radio_idx,
  #endif
  			       u32 tx_antenna,
-@@ -885,7 +885,7 @@ static int rtw_ops_set_antenna(struct ieee80211_hw *hw,
+@@ -887,7 +887,7 @@ static int rtw_ops_set_antenna(struct ieee80211_hw *hw,
  		return -EOPNOTSUPP;
  
  	mutex_lock(&rtwdev->mutex);
@@ -38,7 +38,7 @@ index 8f95e39..8dc2cc1 100644
  	ret = chip->ops->set_antenna(rtwdev, -1, tx_antenna, rx_antenna);
  #else
  	ret = chip->ops->set_antenna(rtwdev, tx_antenna, rx_antenna);
-@@ -896,7 +896,7 @@ static int rtw_ops_set_antenna(struct ieee80211_hw *hw,
+@@ -898,7 +898,7 @@ static int rtw_ops_set_antenna(struct ieee80211_hw *hw,
  }
  
  static int rtw_ops_get_antenna(struct ieee80211_hw *hw,
@@ -47,7 +47,7 @@ index 8f95e39..8dc2cc1 100644
  			       int radio_idx,
  #endif
  			       u32 *tx_antenna,
-@@ -1016,14 +1016,14 @@ static int rtw_ops_set_sar_specs(struct ieee80211_hw *hw,
+@@ -1018,14 +1018,14 @@ static int rtw_ops_set_sar_specs(struct ieee80211_hw *hw,
  
  static void rtw_ops_sta_rc_update(struct ieee80211_hw *hw,
  				  struct ieee80211_vif *vif,
@@ -64,7 +64,7 @@ index 8f95e39..8dc2cc1 100644
  	struct ieee80211_sta *sta = link_sta->sta;
  #endif
  	struct rtw_dev *rtwdev = hw->priv;
-@@ -1073,7 +1073,7 @@ const struct ieee80211_ops rtw_ops = {
+@@ -1075,7 +1075,7 @@ const struct ieee80211_ops rtw_ops = {
  	.reconfig_complete	= rtw_reconfig_complete,
  	.hw_scan		= rtw_ops_hw_scan,
  	.cancel_hw_scan		= rtw_ops_cancel_hw_scan,
@@ -159,10 +159,10 @@ index 1d9c22d..9f0d9fd 100644
  						    tx_report.purge_timer);
  #elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
 diff --git a/usb.c b/usb.c
-index 4e75ada..e115763 100644
+index 5e98df3..c202f63 100644
 --- a/usb.c
 +++ b/usb.c
-@@ -489,13 +489,13 @@ static void rtw_usb_tx_handler(struct work_struct *work)
+@@ -491,13 +491,13 @@ static void rtw_usb_tx_handler(struct work_struct *work)
  
  static void rtw_usb_tx_queue_purge(struct rtw_usb *rtwusb)
  {
@@ -178,7 +178,7 @@ index 4e75ada..e115763 100644
  		ieee80211_purge_tx_queue(rtwdev->hw, &rtwusb->tx_queue[i]);
  #else
  		skb_queue_purge(&rtwusb->tx_queue[i]);
-@@ -1079,11 +1079,11 @@ static void rtw_usb_deinit_tx(struct rtw_dev *rtwdev)
+@@ -1139,11 +1139,11 @@ static void rtw_usb_deinit_tx(struct rtw_dev *rtwdev)
  {
  	struct rtw_usb *rtwusb = rtw_get_usb_priv(rtwdev);
  
