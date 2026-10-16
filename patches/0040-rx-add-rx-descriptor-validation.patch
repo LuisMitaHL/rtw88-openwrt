@@ -1,0 +1,211 @@
+From aa7d92e83811a0b557b75f7a0ce85315f4358bf2 Mon Sep 17 00:00:00 2001
+From: Bitterblue Smith <rtl8821cerfe2@gmail.com>
+Date: Wed, 20 May 2026 14:14:26 +0000
+Subject: [PATCH] wifi: rtw88: Add more validation for the RX descriptor
+
+Some RTL8821CE cards can return frames with corrupted RX descriptor,
+causing warnings and crashes if they are passed to the upper layers.
+
+The PHY status size field is 4 bits wide, but in rtw88 its value should
+only be 0 or 4. Checking this catches most of the corrupt frames.
+
+If a PHY status is present, the PHY status size should not be 0.
+
+The frame size should not be less than or equal to 4 and should not
+exceed 11454.
+
+The rate should not exceed 4SS MCS9.
+
+Discard the frame if any of these checks fail.
+
+Closes: https://bugzilla.kernel.org/show_bug.cgi?id=221286
+Signed-off-by: Bitterblue Smith <rtl8821cerfe2@gmail.com>
+---
+Ported to the lwfinger rtw88 tree (pin a56bcd26e): keeps the 5-argument
+rtw_rx_query_rx_desc() with the rx_buf parameter used there, and drops the
+now-redundant FCS_LEN check from rtw_usb_rx_handler() (upstream had already
+removed it before this commit). The pci.c and sdio.c call sites are updated
+as well so they do not use pkt_stat after a rejected descriptor.
+---
+ pci.c  |  7 +++++--
+ rx.c   | 31 +++++++++++++++++++++----------
+ rx.h   |  6 +++---
+ sdio.c |  9 +++++++--
+ usb.c  | 16 ++++++----------
+ 5 files changed, 42 insertions(+), 27 deletions(-)
+
+diff --git a/pci.c b/pci.c
+index 085e7ab..4c66e4b 100644
+--- a/pci.c
++++ b/pci.c
+@@ -1063,6 +1063,7 @@ static u32 rtw_pci_rx_napi(struct rtw_dev *rtwdev, struct rtw_pci *rtwpci,
+ 	u8 *rx_desc;
+ 	u8 *rx_buf;
+ 	dma_addr_t dma;
++	int ret;
+ 
+ 	count = rtw_pci_get_hw_rx_ring_nr(rtwdev, rtwpci);
+ 	count = min(count, limit);
+@@ -1075,8 +1076,10 @@ static u32 rtw_pci_rx_napi(struct rtw_dev *rtwdev, struct rtw_pci *rtwpci,
+ 					DMA_FROM_DEVICE);
+ 		rx_desc = skb->data;
+ 		rx_buf = rx_desc + pkt_desc_sz;
+-		rtw_rx_query_rx_desc(rtwdev, rx_desc, rx_buf,
+-				     &pkt_stat, &rx_status);
++		ret = rtw_rx_query_rx_desc(rtwdev, rx_desc, rx_buf,
++					   &pkt_stat, &rx_status);
++		if (ret)
++			goto next_rp;
+ 
+ 		/* offset from rx_desc to payload */
+ 		pkt_offset = pkt_desc_sz + pkt_stat.drv_info_sz +
+diff --git a/rx.c b/rx.c
+index 21c6a4c..9de1a0a 100644
+--- a/rx.c
++++ b/rx.c
+@@ -3,6 +3,7 @@
+  */
+ 
+ #include "main.h"
++#include "mac.h"
+ #include "rx.h"
+ #include "ps.h"
+ #include "debug.h"
+@@ -289,9 +290,9 @@ static void rtw_rx_fill_rx_status(struct rtw_dev *rtwdev,
+ 	}
+ }
+ 
+-void rtw_rx_query_rx_desc(struct rtw_dev *rtwdev, void *rx_desc8,
+-			  void *rx_buf, struct rtw_rx_pkt_stat *pkt_stat,
+-			  struct ieee80211_rx_status *rx_status)
++int rtw_rx_query_rx_desc(struct rtw_dev *rtwdev, void *rx_desc8,
++			 void *rx_buf, struct rtw_rx_pkt_stat *pkt_stat,
++			 struct ieee80211_rx_status *rx_status)
+ {
+ 	struct rtw_rx_desc *rx_desc = rx_desc8;
+ 	struct ieee80211_hdr *hdr;
+@@ -322,20 +323,28 @@ void rtw_rx_query_rx_desc(struct rtw_dev *rtwdev, void *rx_desc8,
+ 
+ 	pkt_stat->tsf_low = le32_get_bits(rx_desc->w5, RTW_RX_DESC_W5_TSFL);
+ 
+-	if (unlikely(pkt_stat->rate >= DESC_RATE_MAX)) {
+-		rtw_dbg(rtwdev, RTW_DBG_UNEXP,
+-			"unexpected RX rate=0x%x\n", pkt_stat->rate);
++	if (unlikely(pkt_stat->rate >= DESC_RATE_MAX))
++		return -EINVAL;
+ 
+-		pkt_stat->rate = DESC_RATE1M;
+-		pkt_stat->bw = RTW_CHANNEL_WIDTH_20;
+-	}
++	if (unlikely(pkt_stat->drv_info_sz &&
++		     pkt_stat->drv_info_sz != PHY_STATUS_SIZE))
++		return -EINVAL;
++
++	if (unlikely(pkt_stat->phy_status && !pkt_stat->drv_info_sz))
++		return -EINVAL;
++
++	if (unlikely(pkt_stat->pkt_len > IEEE80211_MAX_MPDU_LEN_VHT_11454))
++		return -EINVAL;
+ 
+ 	/* drv_info_sz is in unit of 8-bytes */
+ 	pkt_stat->drv_info_sz *= 8;
+ 
+ 	/* c2h cmd pkt's rx/phy status is not interested */
+ 	if (pkt_stat->is_c2h)
+-		return;
++		return 0;
++
++	if (unlikely(pkt_stat->pkt_len <= FCS_LEN))
++		return -EINVAL;
+ 
+ 	phy_status = rx_buf + pkt_stat->shift;
+ 
+@@ -346,5 +355,7 @@ void rtw_rx_query_rx_desc(struct rtw_dev *rtwdev, void *rx_desc8,
+ 		rtwdev->chip->ops->query_phy_status(rtwdev, phy_status, pkt_stat);
+ 
+ 	rtw_rx_fill_rx_status(rtwdev, pkt_stat, hdr, rx_status);
++
++	return 0;
+ }
+ EXPORT_SYMBOL(rtw_rx_query_rx_desc);
+diff --git a/rx.h b/rx.h
+index a8a01bf..d5a6f57 100644
+--- a/rx.h
++++ b/rx.h
+@@ -49,9 +49,9 @@ struct rtw_rx_desc {
+ 
+ void rtw_rx_stats(struct rtw_dev *rtwdev, struct ieee80211_vif *vif,
+ 		  struct sk_buff *skb);
+-void rtw_rx_query_rx_desc(struct rtw_dev *rtwdev, void *rx_desc8,
+-			  void *rx_buf, struct rtw_rx_pkt_stat *pkt_stat,
+-			  struct ieee80211_rx_status *rx_status);
++int rtw_rx_query_rx_desc(struct rtw_dev *rtwdev, void *rx_desc8,
++			 void *rx_buf, struct rtw_rx_pkt_stat *pkt_stat,
++			 struct ieee80211_rx_status *rx_status);
+ void rtw_update_rx_freq_from_ie(struct rtw_dev *rtwdev, struct sk_buff *skb,
+ 				struct ieee80211_rx_status *rx_status,
+ 				struct rtw_rx_pkt_stat *pkt_stat);
+diff --git a/sdio.c b/sdio.c
+index 324921f..e835cd8 100644
+--- a/sdio.c
++++ b/sdio.c
+@@ -997,8 +997,13 @@ static void rtw_sdio_rxfifo_recv(struct rtw_dev *rtwdev, u32 rx_len)
+ 	while (true) {
+ 		rx_desc = skb->data;
+ 		rx_buf = rx_desc + pkt_desc_sz;
+-		rtw_rx_query_rx_desc(rtwdev, rx_desc, rx_buf,
+-				     &pkt_stat, &rx_status);
++		ret = rtw_rx_query_rx_desc(rtwdev, rx_desc, rx_buf,
++					   &pkt_stat, &rx_status);
++		if (ret) {
++			dev_kfree_skb_any(skb);
++			return;
++		}
++
+ 		pkt_offset = pkt_desc_sz + pkt_stat.drv_info_sz +
+ 			     pkt_stat.shift;
+ 
+diff --git a/usb.c b/usb.c
+index 65d2560..4e75ada 100644
+--- a/usb.c
++++ b/usb.c
+@@ -638,7 +638,7 @@ static void rtw_usb_rx_handler(unsigned long shut_up_gcc)
+ 	u32 pkt_offset, next_pkt, skb_len;
+ 	u8 *rx_desc;
+ 	u8 *rx_buf;
+-	int limit;
++	int limit, ret;
+ 
+ 	for (limit = 0; limit < 200; limit++) {
+ 		rx_skb = skb_dequeue(&rtwusb->rx_queue);
+@@ -655,8 +655,11 @@ static void rtw_usb_rx_handler(unsigned long shut_up_gcc)
+ 
+ 		do {
+ 			rx_buf = rx_desc + pkt_desc_sz;
+-			rtw_rx_query_rx_desc(rtwdev, rx_desc, rx_buf,
+-					     &pkt_stat, &rx_status);
++			ret = rtw_rx_query_rx_desc(rtwdev, rx_desc, rx_buf,
++						   &pkt_stat, &rx_status);
++			if (ret)
++				break;
++
+ 			pkt_offset = pkt_desc_sz + pkt_stat.drv_info_sz +
+ 				     pkt_stat.shift;
+ 
+@@ -668,13 +671,6 @@ static void rtw_usb_rx_handler(unsigned long shut_up_gcc)
+ 				goto skip_packet;
+ 			}
+ 
+-			if (pkt_stat.pkt_len <= FCS_LEN && !pkt_stat.is_c2h) {
+-				rtw_dbg(rtwdev, RTW_DBG_USB,
+-					"skipping too small packet: %u + %u\n",
+-					pkt_offset, pkt_stat.pkt_len);
+-				goto skip_packet;
+-			}
+-
+ 			skb = alloc_skb(skb_len, GFP_ATOMIC);
+ 			if (!skb) {
+ 				rtw_dbg(rtwdev, RTW_DBG_USB,
+-- 
+2.56.0
+
