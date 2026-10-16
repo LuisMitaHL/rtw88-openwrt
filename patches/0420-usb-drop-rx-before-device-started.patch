@@ -1,0 +1,91 @@
+From 20261016161931.18495-1-25031212351@stu.xidian.edu.cn Mon Sep 17 00:00:00 2001
+From: YuanZhe Liu <25031212351@stu.xidian.edu.cn>
+Date: Sat, 17 Oct 2026 00:19:31 +0800
+Subject: [PATCH] wifi: rtw88: usb: drop RX frames received before the device
+ is started
+
+rtw_usb_probe() submits the bulk-in RX URBs at the end of probe, right
+after rtw_register_hw(). A device can already have data queued on that
+endpoint, so rtw_usb_read_port_complete() runs and queues the frame on
+rtwusb->rx_queue before any interface has been brought up. Submitting
+the URBs late does not close that window: the frame can arrive as soon
+as they are submitted, which is still before the device is started.
+
+rtw_usb_rx_handler() hands every non-C2H frame to mac80211 without
+checking whether the device is running, so ieee80211_rx_irqsafe() runs
+while local->started is still false. mac80211 treats that as a driver
+bug and warns in ieee80211_rx_list():
+
+  WARNING: net/mac80211/rx.c:5601 at ieee80211_rx_list
+   Call Trace:
+    <IRQ>
+    ieee80211_rx_napi
+    ieee80211_rx
+    ieee80211_handle_queued_frames
+    <TASK>
+    rtw_usb_rx_resubmit
+    rtw_usb_setup_rx
+    rtw_usb_probe
+
+The frame is dropped by mac80211 anyway, and because the URB is
+resubmitted from its completion handler, every further frame repeats the
+warning, which floods the log until an interface is actually started.
+
+rtw_ops_tx() already drops frames outside of start/stop by checking
+RTW_FLAG_RUNNING, which mirrors local->started: it is set at the end of
+rtw_core_start() and cleared at the beginning of rtw_core_stop(). Use
+the same check in the RX path and free the frame while the device is not
+running. This also covers the opposite ordering, where a frame that is
+still queued in rtwusb->rx_queue is handed over after the device has
+been stopped again.
+
+C2H packets are left untouched: they go to the firmware event queue
+handled by rtw_fw_c2h_cmd_rx_irqsafe() and are never passed to mac80211.
+
+Fixes: a82dfd33d123 ("wifi: rtw88: Add common USB chip support")
+Cc: stable@vger.kernel.org
+Co-developed-by: Bin Yu <byu@xidian.edu.cn>
+Signed-off-by: Bin Yu <byu@xidian.edu.cn>
+Co-developed-by: Cheng Wen <wencheng@xidian.edu.cn>
+Signed-off-by: Cheng Wen <wencheng@xidian.edu.cn>
+Signed-off-by: YuanZhe Liu <25031212351@stu.xidian.edu.cn>
+---
+Note: not yet merged upstream; v1, unreviewed (patchwork check=fail) and
+not in rtw-next head fbfa27d9b. Ported from
+https://lore.kernel.org/linux-wireless/20261016161931.18495-1-25031212351@stu.xidian.edu.cn/
+No OpenWrt PR. Applies after 0040-rx-add-rx-descriptor-validation.patch,
+which changes the same function.
+ usb.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/usb.c b/usb.c
+index cc68f5e..643268c 100644
+--- a/usb.c
++++ b/usb.c
+@@ -794,7 +794,7 @@ static void rtw_usb_rx_handler(unsigned long shut_up_gcc)
+ 
+ 			if (pkt_stat.is_c2h) {
+ 				rtw_fw_c2h_cmd_rx_irqsafe(rtwdev, pkt_offset, skb);
+-			} else {
++			} else if (test_bit(RTW_FLAG_RUNNING, rtwdev->flags)) {
+ 				skb_pull(skb, pkt_offset);
+ 				rtw_update_rx_freq_for_invalid(rtwdev, skb,
+ 							       &rx_status,
+@@ -802,6 +802,14 @@ static void rtw_usb_rx_handler(unsigned long shut_up_gcc)
+ 				rtw_rx_stats(rtwdev, pkt_stat.vif, skb);
+ 				memcpy(skb->cb, &rx_status, sizeof(rx_status));
+ 				ieee80211_rx_irqsafe(rtwdev->hw, skb);
++			} else {
++				/*
++				 * RX URBs are submitted at the end of probe,
++				 * so frames can arrive before the device has
++				 * been started. mac80211 does not accept
++				 * frames in that state, so drop them here.
++				 */
++				dev_kfree_skb_any(skb);
+ 			}
+ 
+ skip_packet:
+-- 
+2.56.0
+

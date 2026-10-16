@@ -1,0 +1,269 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: LuisMitaHL <luis@example.invalid>
+Date: Fri, 16 Oct 2026 12:00:00 +0000
+Subject: [PATCH] rtw88: add support for iw set txpower (downstream feature)
+
+This is a self-maintained downstream feature, not an upstream backport.
+
+Implement the standard `iw phy <phy> set txpower fixed|limited <mBm>`
+interface. mac80211 hands the driver the already-resolved effective
+power: min(regulatory, user request, AP limit), as a total. Cache it in
+struct rtw_hal and clamp the per-rate-section TX power offset by it in
+rtw_phy_get_tx_power_index().
+
+The cfg80211 value is a total, so it is shared across the active TX
+paths (path_share_dbm, as ath9k and the vendor drivers do) before being
+converted to a power index. Because mac80211's value is already the
+resolved minimum, no FIXED/LIMITED/AUTOMATIC distinction is needed:
+clamping to it is a no-op when no user request is active.
+
+rtw_ops_get_txpower() reports the cap when one is set, otherwise an
+estimate derived from the 6M rate entry of the power table. The debugfs
+tx_pwr_tbl gains a "usr" column and the effective column becomes
+min(by_rate, lmt, sar, usr).
+
+The config() hook is unguarded (IEEE80211_CONF_CHANGE_POWER exists in
+every supported mac80211); bss_info_changed() only guards against the
+unset value (INT_MIN) that mac80211 passes while the link is down.
+get_txpower() is guarded at 6.14, where the link_id argument was added;
+the existing compat patcher rewrites that check per OpenWrt branch.
+No .set_txpower is registered: ieee80211_ops::set_txpower does not
+exist in mainline mac80211.
+---
+Note: downstream feature, not an upstream backport and not upstreamable.
+No upstream hash. Combines the shell of LuisMitaHL/rtw88 95670778ce with
+the total-power clamp semantics proposed by Mehmet Fide (lore
+20260917141906.1361197-1-mehmet.fide@gmail.com, withdrawn). Must be
+applied after every other 0xxx patch; the 999 compat patch stays last.
+ debug.c    | 15 ++++++++-------
+ mac80211.c | 46 ++++++++++++++++++++++++++++++++++++++++++++++
+ main.h     |  5 +++++
+ phy.c      | 33 +++++++++++++++++++++++++++++++++
+ phy.h      |  1 +
+ 5 files changed, 93 insertions(+), 7 deletions(-)
+
+diff --git a/debug.c b/debug.c
+index 84e45af..0273b18 100644
+--- a/debug.c
++++ b/debug.c
+@@ -711,8 +711,8 @@ static int rtw_debugfs_get_tx_pwr_tbl(struct seq_file *m, void *v)
+ 	seq_printf(m, "channel: %u\n", ch);
+ 	seq_printf(m, "bandwidth: %u\n", bw);
+ 	seq_printf(m, "regulatory: %s\n", rtw_get_regd_string(regd));
+-	seq_printf(m, "%-4s %-10s %-9s %-9s (%-4s %-4s %-4s) %-4s\n",
+-		   "path", "rate", "pwr", "base", "byr", "lmt", "sar", "rem");
++	seq_printf(m, "%-4s %-10s %-9s %-9s (%-4s %-4s %-4s %-4s) %-4s\n",
++		   "path", "rate", "pwr", "base", "byr", "lmt", "sar", "usr", "rem");
+ 
+ 	max_ht_rate = DESC_RATEMCS0 + nss * 8 - 1;
+ 
+@@ -738,15 +738,16 @@ static int rtw_debugfs_get_tx_pwr_tbl(struct seq_file *m, void *v)
+ 
+ 			seq_printf(m, "%4c ", path + 'A');
+ 			rtw_print_rate(m, rate);
+-			seq_printf(m, " %3u(0x%02x) %4u %4d (%4d %4d %4d) %4d\n",
++			seq_printf(m, " %3u(0x%02x) %4u %4d (%4d %4d %4d %4d) %4d\n",
+ 				   hal->tx_pwr_tbl[path][rate],
+ 				   hal->tx_pwr_tbl[path][rate],
+ 				   pwr_param.pwr_base,
+-				   min3(pwr_param.pwr_offset,
+-					pwr_param.pwr_limit,
+-					pwr_param.pwr_sar),
++				   min(min(min(pwr_param.pwr_offset,
++					       pwr_param.pwr_limit),
++					   pwr_param.pwr_sar),
++				       pwr_param.pwr_user),
+ 				   pwr_param.pwr_offset, pwr_param.pwr_limit,
+-				   pwr_param.pwr_sar,
++				   pwr_param.pwr_sar, pwr_param.pwr_user,
+ 				   pwr_param.pwr_remnant);
+ 		}
+ 	}
+diff --git a/mac80211.c b/mac80211.c
+index 73da0e3..177a47a 100644
+--- a/mac80211.c
++++ b/mac80211.c
+@@ -6,6 +6,7 @@
+ #include "sec.h"
+ #include "tx.h"
+ #include "fw.h"
++#include "phy.h"
+ #include "mac.h"
+ #include "coex.h"
+ #include "ps.h"
+@@ -89,6 +90,24 @@ static void rtw_ops_stop(struct ieee80211_hw *hw, bool suspend)
+ }
+ 
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
++/*
++ * Apply a TX power cap from mac80211. Must be called with rtwdev->mutex held.
++ * dbm is the effective total: mac80211 already took min(regulatory, user, ap),
++ * so this is correct for NL80211_TX_POWER_FIXED and _LIMITED alike, and is a
++ * no-op (equals the regulatory max) when no user request is active.
++ */
++static void rtw_set_tx_power(struct rtw_dev *rtwdev, int dbm)
++{
++	struct rtw_hal *hal = &rtwdev->hal;
++
++	if (dbm == INT_MIN)
++		return;
++
++	hal->txpwr_cap_set = true;
++	hal->txpwr_cap_dbm = dbm;
++	rtw_phy_set_tx_power_level(rtwdev, hal->current_channel);
++}
++
+ static int rtw_ops_config(struct ieee80211_hw *hw, int radio_idx, u32 changed)
+ #else
+ static int rtw_ops_config(struct ieee80211_hw *hw, u32 changed)
+@@ -115,6 +134,8 @@ static int rtw_ops_config(struct ieee80211_hw *hw, u32 changed)
+ 
+ 	if (changed & IEEE80211_CONF_CHANGE_CHANNEL)
+ 		rtw_set_channel(rtwdev);
++	else if (changed & IEEE80211_CONF_CHANGE_POWER)
++		rtw_set_tx_power(rtwdev, rtwdev->hw->conf.power_level);
+ 
+ 	if ((changed & IEEE80211_CONF_CHANGE_IDLE) &&
+ 	    (hw->conf.flags & IEEE80211_CONF_IDLE) &&
+@@ -504,6 +525,9 @@ static void rtw_ops_bss_info_changed(struct ieee80211_hw *hw,
+ 	if (changed & BSS_CHANGED_PS)
+ 		rtw_recalc_lps(rtwdev, NULL);
+ 
++	if (changed & BSS_CHANGED_TXPOWER)
++		rtw_set_tx_power(rtwdev, conf->txpower);
++
+ 	rtw_vif_port_config(rtwdev, rtwvif, config);
+ 
+ 	mutex_unlock(&rtwdev->mutex);
+@@ -1085,6 +1109,27 @@ static void rtw_ops_sta_rc_update(struct ieee80211_hw *hw,
+ 		ieee80211_queue_work(rtwdev->hw, &si->rc_work);
+ }
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0)
++static int rtw_ops_get_txpower(struct ieee80211_hw *hw,
++			       struct ieee80211_vif *vif,
++			       unsigned int link_id, int *dbm)
++#else
++static int rtw_ops_get_txpower(struct ieee80211_hw *hw,
++			       struct ieee80211_vif *vif,
++			       int *dbm)
++#endif
++{
++	struct rtw_dev *rtwdev = hw->priv;
++	struct rtw_hal *hal = &rtwdev->hal;
++
++	if (hal->txpwr_cap_set)
++		*dbm = hal->txpwr_cap_dbm;
++	else
++		*dbm = hal->tx_pwr_tbl[0][DESC_RATE6M] >> rtwdev->chip->txgi_factor;
++
++	return 0;
++}
++
+ const struct ieee80211_ops rtw_ops = {
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 9, 0)
+ 	.add_chanctx = ieee80211_emulate_add_chanctx,
+@@ -1109,6 +1154,7 @@ const struct ieee80211_ops rtw_ops = {
+ 	.sta_remove		= rtw_ops_sta_remove,
+ 	.set_tim		= rtw_ops_set_tim,
+ 	.channel_switch_beacon	= rtw_ops_channel_switch_beacon,
++	.get_txpower		= rtw_ops_get_txpower,
+ 	.set_key		= rtw_ops_set_key,
+ 	.ampdu_action		= rtw_ops_ampdu_action,
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 20, 0)
+diff --git a/main.h b/main.h
+index ae7b14a..3c18647 100644
+--- a/main.h
++++ b/main.h
+@@ -2171,6 +2171,11 @@ struct rtw_hal {
+ 	s8 tx_pwr_tbl[RTW_RF_PATH_MAX]
+ 		     [DESC_RATE_MAX];
+ 
++	/* ---- TX power cap (nl80211 / iw set txpower) ---- */
++	bool txpwr_cap_set;         /* false until first mac80211 txpower notification */
++	s32  txpwr_cap_dbm;         /* mac80211-resolved effective cap, total power (dBm) */
++	bool txpwr_cap_is_limiting; /* driver offset clamp is binding (rf_path 0, 6M) */
++
+ 	enum rtw_sar_bands sar_band;
+ 	struct rtw_sar sar;
+ 
+diff --git a/phy.c b/phy.c
+index 33aa759..10ff9c0 100644
+--- a/phy.c
++++ b/phy.c
+@@ -2253,6 +2253,30 @@ err:
+ }
+ #endif
+ 
++static s8 rtw_phy_get_user_tx_power_limit(struct rtw_dev *rtwdev, u8 band,
++					  u8 path, u8 rate)
++{
++	struct rtw_hal *hal = &rtwdev->hal;
++	const struct rtw_chip_info *chip = rtwdev->chip;
++	static const u8 path_share_dbm[] = { 0, 0, 3, 5, 6 };
++	u8 rs = rtw_phy_rate_to_rate_section(rate);
++	u8 paths = clamp_t(u8, hweight8(hal->antenna_tx), 1, 4);
++	s32 idx;
++	s8 base;
++
++	if (!hal->txpwr_cap_set || rs >= RTW_RATE_SECTION_NUM)
++		return (s8)chip->max_power_index;
++
++	/* cfg80211 value is a total: share it across active TX paths */
++	idx = (hal->txpwr_cap_dbm - path_share_dbm[paths]) << chip->txgi_factor;
++	base = band == PHY_BAND_2G ?
++	       hal->tx_pwr_by_rate_base_2g[path][rs] :
++	       hal->tx_pwr_by_rate_base_5g[path][rs];
++
++	return (s8)clamp_t(s32, idx, -chip->max_power_index - 1,
++			   chip->max_power_index) - base;
++}
++
+ void rtw_get_tx_power_params(struct rtw_dev *rtwdev, u8 path, u8 rate, u8 bw,
+ 			     u8 ch, u8 regd, struct rtw_power_params *pwr_param)
+ {
+@@ -2264,6 +2288,7 @@ void rtw_get_tx_power_params(struct rtw_dev *rtwdev, u8 path, u8 rate, u8 bw,
+ 	s8 *offset = &pwr_param->pwr_offset;
+ 	s8 *limit = &pwr_param->pwr_limit;
+ 	s8 *remnant = &pwr_param->pwr_remnant;
++	s8 *user = &pwr_param->pwr_user;
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
+ 	s8 *sar = &pwr_param->pwr_sar;
+ #endif
+@@ -2290,6 +2315,7 @@ void rtw_get_tx_power_params(struct rtw_dev *rtwdev, u8 path, u8 rate, u8 bw,
+ 					    rate, ch, regd);
+ 	*remnant = rate <= DESC_RATE11M ? dm_info->txagc_remnant_cck :
+ 					  dm_info->txagc_remnant_ofdm[path];
++	*user = rtw_phy_get_user_tx_power_limit(rtwdev, band, path, rate);
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
+ 	*sar = rtw_phy_get_tx_power_sar(rtwdev, hal->sar_band, path, rate);
+ #endif
+@@ -2310,6 +2336,13 @@ rtw_phy_get_tx_power_index(struct rtw_dev *rtwdev, u8 rf_path, u8 rate,
+ 	offset = min3(pwr_param.pwr_offset,
+ 		      pwr_param.pwr_limit,
+ 		      pwr_param.pwr_sar);
++	offset = min(offset, pwr_param.pwr_user);
++
++	if (rf_path == 0 && rate == DESC_RATE6M)
++		rtwdev->hal.txpwr_cap_is_limiting =
++			pwr_param.pwr_user <= min3(pwr_param.pwr_offset,
++						    pwr_param.pwr_limit,
++						    pwr_param.pwr_sar);
+ 
+ 	if (rtwdev->chip->en_dis_dpd)
+ 		offset += rtw_phy_get_dis_dpd_by_rate_diff(rtwdev, rate);
+diff --git a/phy.h b/phy.h
+index 8449936..c26f183 100644
+--- a/phy.h
++++ b/phy.h
+@@ -155,6 +155,7 @@ struct rtw_power_params {
+ 	s8 pwr_limit;
+ 	s8 pwr_remnant;
+ 	s8 pwr_sar;
++	s8 pwr_user;
+ };
+ 
+ void
+-- 
+2.56.0
+

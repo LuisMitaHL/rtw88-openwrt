@@ -1,0 +1,86 @@
+From 20261007091225.413-3-jeremy.fareau@gmail.com Mon Sep 17 00:00:00 2001
+From: Jeremy Fareau <jeremy.fareau@gmail.com>
+Date: Wed, 7 Oct 2026 12:12:25 +0300
+Subject: [PATCH] wifi: rtw88: restore the control frame filter when the device
+ is started
+
+Commit ed51a86b787f ("wifi: rtw88: Enable receiving control frames in
+monitor mode") writes REG_RXFLTMAP1 from configure_filter(), but that
+register is reset to the chip default by the chip's mac_init() during
+power_on().  mac80211 only calls ieee80211_ops::configure_filter() when
+its own filter flags change, so after a stop/start cycle the flags are
+unchanged and the control frame filter silently reverts: monitor mode
+stops delivering control frames again.
+
+Keep track of the value configure_filter() last asked for and restore
+it in rtw_core_start(), next to the RCR restore, which exists for the
+same reason.
+
+Measured on an RTL8814AU and an RTL8812AU in monitor mode on channel 6,
+40 s captures taken after a down/up cycle.  Control frames go from 0 to
+23184 and from 0 to 483 respectively; without this change both are 0.
+
+Fixes: ed51a86b787f ("wifi: rtw88: Enable receiving control frames in monitor mode")
+Assisted-by: LLM
+Signed-off-by: Jeremy Fareau <jeremy.fareau@gmail.com>
+---
+Note: not yet merged upstream (series "channel and control frame filter
+lost on interface restart"). Ported from the series cover
+https://lore.kernel.org/linux-wireless/20261007091225.413-1-jeremy.fareau@gmail.com/
+No stable upstream hash yet.
+ mac80211.c | 5 +++--
+ main.c     | 8 ++++++++
+ main.h     | 1 +
+ 3 files changed, 12 insertions(+), 2 deletions(-)
+
+diff --git a/mac80211.c b/mac80211.c
+index a90dd71..d31dbb2 100644
+--- a/mac80211.c
++++ b/mac80211.c
+@@ -310,9 +310,10 @@ static void rtw_ops_configure_filter(struct ieee80211_hw *hw,
+ 
+ 	if (changed_flags & FIF_CONTROL) {
+ 		if (*new_flags & FIF_CONTROL)
+-			rtw_write16(rtwdev, REG_RXFLTMAP1, 0xffff);
++			rtwdev->hal.rxfltmap1_cur = 0xffff;
+ 		else
+-			rtw_write16(rtwdev, REG_RXFLTMAP1, rtwdev->hal.rxfltmap1);
++			rtwdev->hal.rxfltmap1_cur = rtwdev->hal.rxfltmap1;
++		rtw_write16(rtwdev, REG_RXFLTMAP1, rtwdev->hal.rxfltmap1_cur);
+ 	}
+ 	if (changed_flags & FIF_ALLMULTI) {
+ 		if (*new_flags & FIF_ALLMULTI)
+diff --git a/main.c b/main.c
+index da9667f..716fbf2 100644
+--- a/main.c
++++ b/main.c
+@@ -1623,6 +1623,14 @@ int rtw_core_start(struct rtw_dev *rtwdev)
+ 	/* rcr reset after powered on */
+ 	rtw_write32(rtwdev, REG_RCR, rtwdev->hal.rcr);
+ 
++	/* REG_RXFLTMAP1 is reset by the chip's mac_init() during power_on(),
++	 * and mac80211 only calls ieee80211_ops::configure_filter() when its
++	 * own filter flags change.  After a stop/start cycle the flags are
++	 * unchanged, so restore the value configure_filter() last asked for.
++	 */
++	if (rtwdev->hal.rxfltmap1_cur)
++		rtw_write16(rtwdev, REG_RXFLTMAP1, rtwdev->hal.rxfltmap1_cur);
++
+ 	ieee80211_queue_delayed_work(rtwdev->hw, &rtwdev->watch_dog_work,
+ 				     RTW_WATCH_DOG_DELAY_TIME);
+ 
+diff --git a/main.h b/main.h
+index 367fe89..e5375d2 100644
+--- a/main.h
++++ b/main.h
+@@ -2117,6 +2117,7 @@ struct rtw_sar {
+ struct rtw_hal {
+ 	u32 rcr;
+ 	u16 rxfltmap1;
++	u16 rxfltmap1_cur;
+ 
+ 	u32 chip_version;
+ 	u8 cut_version;
+-- 
+2.56.0
+

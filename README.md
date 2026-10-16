@@ -43,7 +43,10 @@ rtw88 is not directly compatible with OpenWrt. This is because OpenWrt uses a hy
 
 The `patches` folder holds two kinds of patches, applied in filename order:
 
-- `0xxx-*.patch` — upstream rtw88 fixes backported from `pkshih/rtw` `rtw-next`, one file per upstream commit. They apply to the raw lwfinger tree and are shared by every OpenWrt version.
+- `0xxx-*.patch` — rtw88 fixes and features, one file per commit. They apply to the raw lwfinger tree and are shared by every OpenWrt version, in filename order:
+  - `00xx`–`03xx` — backports of commits already merged in `pkshih/rtw` `rtw-next`. The first line of each file is the upstream commit id.
+  - `04xx`–`05xx` — fixes submitted to the mailing list but **not merged yet**. The first line carries the lore Message-ID instead of a commit id, and a `Note:` after the mail header records where the patch came from and what it depends on.
+  - `09xx` — features maintained in this repo and not submitted upstream.
 - `999-openwrt-<version>-compat.patch` — the per-version rewrite of the `LINUX_VERSION_CODE` checks. Keep only the one matching your OpenWrt version, and keep it last: it is generated on top of the `0xxx-*.patch` files.
 
 You can generate your own compat patch if the rtw88 repo has been updated, or you want to test or revert some code and the provided patch does not work anymore.

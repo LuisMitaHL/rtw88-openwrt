@@ -1,0 +1,43 @@
+From 0fe85a5f9ef3e07a1c656890e7033efe98daffa0 Mon Sep 17 00:00:00 2001
+From: YuChia-Kan <raspberrykan@stu.hqu.edu.cn>
+Date: Wed, 2 Sep 2026 03:14:08 +0000
+Subject: [PATCH] wifi: rtw88: use firmware MAC address as fallback
+
+Some devices provide the Wi-Fi MAC address through firmware instead of
+storing a valid address in the Wi-Fi chip efuse.
+
+This is the case on the Xiaomi Mi Box 4, which uses an Amlogic S905L
+SoC and an RTL8723DS Wi-Fi chip. The Wi-Fi MAC address is stored in the
+S905L efuse rather than the RTL8723DS efuse and is provided to the
+device through firmware.
+
+Try to read the MAC address from firmware before falling back to a
+randomly generated address.
+
+Signed-off-by: YuChia-Kan <raspberrykan@stu.hqu.edu.cn>
+Acked-by: Ping-Ke Shih <pkshih@realtek.com>
+---
+ main.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/main.c b/main.c
+index 94b3b62..da9667f 100644
+--- a/main.c
++++ b/main.c
+@@ -2167,8 +2167,11 @@ static int rtw_chip_efuse_info_setup(struct rtw_dev *rtwdev)
+ 	efuse->ext_lna_5g = efuse->lna_type_5g & BIT(3) ? 1 : 0;
+ 
+ 	if (!is_valid_ether_addr(efuse->addr)) {
+-		eth_random_addr(efuse->addr);
+-		dev_warn(rtwdev->dev, "efuse MAC invalid, using random\n");
++		if (device_get_mac_address(rtwdev->dev, efuse->addr)) {
++			eth_random_addr(efuse->addr);
++			dev_warn(rtwdev->dev,
++				 "failed to get valid MAC address, using random\n");
++		}
+ 	}
+ 
+ out_disable:
+-- 
+2.56.0
+
