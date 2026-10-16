@@ -1,0 +1,42 @@
+From 000e63e67a78456bed43a8d681ff83e8f36ad1af Mon Sep 17 00:00:00 2001
+From: Chen Jung Ku <ku.loong@gapp.nthu.edu.tw>
+Date: Sat, 13 Jun 2026 17:04:34 +0000
+Subject: [PATCH] wifi: rtw88: 8822c: replace msleep() with fsleep() for DPK
+ delays
+
+Replace msleep() with fsleep(), because msleep() may oversleep
+to as much as 20 ms when used for a 10 ms delay.
+According to the kernel documentation, fsleep() is more suitable
+and aligns better with modern kernel style.
+
+Signed-off-by: Chen Jung Ku <ku.loong@gapp.nthu.edu.tw>
+Acked-by: Ping-Ke Shih <pkshih@realtek.com>
+---
+ rtw8822c.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/rtw8822c.c b/rtw8822c.c
+index 827340f..d5c2a8b 100644
+--- a/rtw8822c.c
++++ b/rtw8822c.c
+@@ -3410,7 +3410,7 @@ static u8 rtw8822c_dpk_one_shot(struct rtw_dev *rtwdev, u8 path, u8 action)
+ 		rtw_write32_mask(rtwdev, REG_DPD_CTL0, BIT(12), 0x1);
+ 		rtw_write32_mask(rtwdev, REG_DPD_CTL0, BIT(12), 0x0);
+ 		rtw_write32_mask(rtwdev, REG_RXSRAM_CTL, BIT_RPT_SEL, 0x0);
+-		msleep(10);
++		fsleep(10000);
+ 		if (!check_hw_ready(rtwdev, REG_STAT_RPT, BIT(31), 0x1)) {
+ 			result = 1;
+ 			rtw_dbg(rtwdev, RTW_DBG_RFK, "[DPK] one-shot over 20ms\n");
+@@ -3423,7 +3423,7 @@ static u8 rtw8822c_dpk_one_shot(struct rtw_dev *rtwdev, u8 path, u8 action)
+ 		dpk_cmd = rtw8822c_dpk_get_cmd(rtwdev, action, path);
+ 		rtw_write32(rtwdev, REG_NCTL0, dpk_cmd);
+ 		rtw_write32(rtwdev, REG_NCTL0, dpk_cmd + 1);
+-		msleep(10);
++		fsleep(10000);
+ 		if (!check_hw_ready(rtwdev, 0x2d9c, 0xff, 0x55)) {
+ 			result = 1;
+ 			rtw_dbg(rtwdev, RTW_DBG_RFK, "[DPK] one-shot over 20ms\n");
+-- 
+2.56.0
+
