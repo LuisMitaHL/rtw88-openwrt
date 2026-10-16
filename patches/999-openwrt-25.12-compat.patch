@@ -1,5 +1,5 @@
 diff --git a/mac80211.c b/mac80211.c
-index 9e583b5..7151416 100644
+index 8f95e39..8dc2cc1 100644
 --- a/mac80211.c
 +++ b/mac80211.c
 @@ -77,7 +77,7 @@ static void rtw_ops_stop(struct ieee80211_hw *hw, bool suspend)
@@ -124,10 +124,10 @@ index 737e3e2..1fac250 100644
  #endif
  				u32 antenna_tx,
 diff --git a/sdio.c b/sdio.c
-index 324921f..4915886 100644
+index e835cd8..f9c7f24 100644
 --- a/sdio.c
 +++ b/sdio.c
-@@ -1317,7 +1317,7 @@ static void rtw_sdio_deinit_tx(struct rtw_dev *rtwdev)
+@@ -1322,7 +1322,7 @@ static void rtw_sdio_deinit_tx(struct rtw_dev *rtwdev)
  	struct rtw_sdio *rtwsdio = (struct rtw_sdio *)rtwdev->priv;
  	int i;
  
@@ -136,7 +136,7 @@ index 324921f..4915886 100644
  	for (i = 0; i < RTK_MAX_TX_QUEUE_NUM; i++)
  		skb_queue_purge(&rtwsdio->tx_queue[i]);
  #endif
-@@ -1325,7 +1325,7 @@ static void rtw_sdio_deinit_tx(struct rtw_dev *rtwdev)
+@@ -1330,7 +1330,7 @@ static void rtw_sdio_deinit_tx(struct rtw_dev *rtwdev)
  	destroy_workqueue(rtwsdio->txwq);
  	kfree(rtwsdio->tx_handler_data);
  
@@ -146,7 +146,7 @@ index 324921f..4915886 100644
  		ieee80211_purge_tx_queue(rtwdev->hw, &rtwsdio->tx_queue[i]);
  #endif
 diff --git a/tx.c b/tx.c
-index e648816..a7dea0b 100644
+index 1d9c22d..9f0d9fd 100644
 --- a/tx.c
 +++ b/tx.c
 @@ -198,7 +198,7 @@ void rtw_tx_report_purge_timer(struct timer_list *t)
@@ -159,10 +159,10 @@ index e648816..a7dea0b 100644
  						    tx_report.purge_timer);
  #elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
 diff --git a/usb.c b/usb.c
-index 95cd1db..d2b158d 100644
+index 4e75ada..e115763 100644
 --- a/usb.c
 +++ b/usb.c
-@@ -482,13 +482,13 @@ static void rtw_usb_tx_handler(struct work_struct *work)
+@@ -489,13 +489,13 @@ static void rtw_usb_tx_handler(struct work_struct *work)
  
  static void rtw_usb_tx_queue_purge(struct rtw_usb *rtwusb)
  {
@@ -178,7 +178,7 @@ index 95cd1db..d2b158d 100644
  		ieee80211_purge_tx_queue(rtwdev->hw, &rtwusb->tx_queue[i]);
  #else
  		skb_queue_purge(&rtwusb->tx_queue[i]);
-@@ -1074,11 +1074,11 @@ static void rtw_usb_deinit_tx(struct rtw_dev *rtwdev)
+@@ -1079,11 +1079,11 @@ static void rtw_usb_deinit_tx(struct rtw_dev *rtwdev)
  {
  	struct rtw_usb *rtwusb = rtw_get_usb_priv(rtwdev);
  
