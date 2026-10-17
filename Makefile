@@ -20,6 +20,9 @@ include $(INCLUDE_DIR)/kernel.mk
 include $(INCLUDE_DIR)/package.mk
 
 define Package/rtw88-backports-firmware
+  # Firmware blobs are architecture-independent, so the package is installable
+  # on any target (apk metadata "arch:noarch").
+  PKGARCH:=all
   TITLE:= Realtek rtw88 firmware files
   SECTION:=firmware
   CATEGORY:=Firmware
