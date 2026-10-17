@@ -34,6 +34,18 @@ RTW_AUTOLOAD := rtw_8821cu \
 		rtw_8821au \
 		rtw_8723du
 
+# Firmware blobs for the chips this package ships (see RTW_MODULES/AUTOLOAD).
+# Deliberately not a wildcard: the pinned tree also carries RTL8703B firmware
+# for a chip no module here supports.
+RTW_FW:= rtw8723d_fw.bin \
+	rtw8812a_fw.bin \
+	rtw8814a_fw.bin \
+	rtw8821a_fw.bin \
+	rtw8821c_fw.bin \
+	rtw8822b_fw.bin \
+	rtw8822c_fw.bin \
+	rtw8822c_wow_fw.bin
+
 define KernelPackage/rtw88-backports-usb
   SUBMENU:=Wireless Drivers
   TITLE:= Realtek RTL8822CU AP Mode
@@ -99,7 +111,7 @@ endef
 define Package/rtw88-backports-firmware/install
 	$(INSTALL_DIR) $(1)/lib/firmware/rtw88
 	$(INSTALL_DATA) \
-		$(PKG_BUILD_DIR)/firmware/* \
+		$(addprefix $(PKG_BUILD_DIR)/firmware/,$(RTW_FW)) \
 		$(1)/lib/firmware/rtw88/
 endef
 
