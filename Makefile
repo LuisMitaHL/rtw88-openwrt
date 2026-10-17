@@ -87,28 +87,18 @@ NOSTDINC_FLAGS = \
 	-include backport/backport.h \
 	-Wno-error=cast-function-type
 
-EXTRA_CFLAGS:= \
-	-DRTW_SINGLE_WIPHY \
-	-DRTW_USE_CFG80211_STA_EVENT \
-	-DCONFIG_IOCTL_CFG80211 \
-	-DCONFIG_CONCURRENT_MODE \
-	-DBUILD_OPENWRT
-
 # The pinned upstream Makefile builds rtw_pci.o (with pci_old.o), rtw_sdio.o
 # and every *e/*s chip variant whenever the target kernel has CONFIG_PCI /
 # CONFIG_MMC. None of those are shipped by this USB-only package, so force
 # both gates off and let kbuild only build what is listed in FILES.
 EXTRA_KCONFIG:= \
 	CONFIG_PCI=n \
-	CONFIG_MMC= \
-	CONFIG_RTW88-BACKPORTS-USB=m \
-	USER_MODULE_NAME=rtw88-backports-usb
+	CONFIG_MMC=
 
 MAKE_OPTS:= \
 	$(KERNEL_MAKE_FLAGS) \
 	M="$(PKG_BUILD_DIR)" \
 	NOSTDINC_FLAGS="$(NOSTDINC_FLAGS)" \
-	USER_EXTRA_CFLAGS="$(EXTRA_CFLAGS)" \
 	$(EXTRA_KCONFIG)
 
 define Build/Compile
