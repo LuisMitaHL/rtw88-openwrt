@@ -3,7 +3,7 @@ include $(TOPDIR)/rules.mk
 PKG_NAME:=rtw88-backports-usb
 PKG_RELEASE:=1
 
-PKG_LICENSE:=GPLv2
+PKG_LICENSE:=GPL-2.0-only OR BSD-3-Clause
 PKG_LICENSE_FILES:=
 
 PKG_SOURCE_URL:=https://github.com/lwfinger/rtw88
