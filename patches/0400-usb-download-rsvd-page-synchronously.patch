@@ -59,7 +59,7 @@ diff --git a/usb.c b/usb.c
 index de0a73f..cc68f5e 100644
 --- a/usb.c
 +++ b/usb.c
-@@ -396,6 +396,51 @@ static int rtw_usb_write_port(struct rtw_dev *rtwdev, u8 qsel, struct sk_buff *s
+@@ -396,6 +396,56 @@ static int rtw_usb_write_port(struct rtw_dev *rtwdev, u8 qsel, struct sk_buff *s
  	return ret;
  }
  
@@ -94,7 +94,12 @@ index de0a73f..cc68f5e 100644
 +	if (ret)
 +		goto out;
 +
-+	if (wait_for_completion_timeout(&done, secs_to_jiffies(5))) {
++	if (wait_for_completion_timeout(&done,
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
++					secs_to_jiffies(5))) {
++#else
++					msecs_to_jiffies(5000))) {
++#endif
 +		ret = urb->status;
 +	} else {
 +		/* timed out; usb_kill_urb() waits for the completion handler */

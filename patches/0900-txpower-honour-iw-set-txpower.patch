@@ -94,7 +94,6 @@ index 73da0e3..177a47a 100644
 @@ -89,6 +90,24 @@ static void rtw_ops_stop(struct ieee80211_hw *hw, bool suspend)
  }
  
- #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
 +/*
 + * Apply a TX power cap from mac80211. Must be called with rtwdev->mutex held.
 + * dbm is the effective total: mac80211 already took min(regulatory, user, ap),
@@ -113,6 +112,7 @@ index 73da0e3..177a47a 100644
 +	rtw_phy_set_tx_power_level(rtwdev, hal->current_channel);
 +}
 +
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
  static int rtw_ops_config(struct ieee80211_hw *hw, int radio_idx, u32 changed)
  #else
  static int rtw_ops_config(struct ieee80211_hw *hw, u32 changed)

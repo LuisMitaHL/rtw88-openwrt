@@ -21,7 +21,7 @@ index a4f4121..ce221fb 100644
  #else
  		bfee->aid = bss_conf->aid;
 diff --git a/fw.c b/fw.c
-index 1281685..06b3672 100644
+index a15e106..53cabfa 100644
 --- a/fw.c
 +++ b/fw.c
 @@ -196,7 +196,7 @@ legacy:
@@ -92,7 +92,7 @@ index dfae7c3..4235326 100644
  			 bool reset_ra_mask);
  #else
 diff --git a/mac80211.c b/mac80211.c
-index 177a47a..97c9235 100644
+index 63ca926..2de57fa 100644
 --- a/mac80211.c
 +++ b/mac80211.c
 @@ -423,7 +423,7 @@ static void rtw_conf_tx(struct rtw_dev *rtwdev,
@@ -404,6 +404,19 @@ index c6360cf..1392529 100644
  	if (data.count == 1 && data.found_vif->cfg.ps) {
  		rtwdev->ps_enabled = true;
  	} else {
+diff --git a/rx.c b/rx.c
+index 9de1a0a..e109794 100644
+--- a/rx.c
++++ b/rx.c
+@@ -186,7 +186,7 @@ void rtw_update_rx_freq_from_ie(struct rtw_dev *rtwdev, struct sk_buff *skb,
+ #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 4, 0))
+ 	channel_number = cfg80211_get_ies_channel_number(variable, ielen,
+ 							 NL80211_BAND_2GHZ);
+-#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0))
++#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)) || defined(OPENWRT)
+ 	channel_number = cfg80211_get_ies_channel_number(variable, ielen,
+ 							 NL80211_BAND_2GHZ, 0);
+ #else
 diff --git a/tx.c b/tx.c
 index 1d9c22d..9a04a57 100644
 --- a/tx.c

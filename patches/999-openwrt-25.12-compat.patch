@@ -1,38 +1,16 @@
-diff --git a/fw.c b/fw.c
-index 1281685..a8e3fba 100644
---- a/fw.c
-+++ b/fw.c
-@@ -1912,7 +1912,7 @@ void rtw_fw_csa_beacon_work(struct work_struct *work)
- 		goto out;
- 	}
- 
--#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0)
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0) || defined(OPENWRT)
- 	if (!ieee80211_beacon_cntdwn_is_complete(vif, 0)) {
- #else
- 	if (!ieee80211_beacon_cntdwn_is_complete(vif)) {
-@@ -1922,7 +1922,7 @@ void rtw_fw_csa_beacon_work(struct work_struct *work)
- 		rtw_fw_csa_queue(rtwdev, vif);
- 	} else {
- 		rtwdev->csa_vif = NULL;
--#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0)
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0) || defined(OPENWRT)
- 		ieee80211_csa_finish(vif, 0);
- #else
- 		ieee80211_csa_finish(vif);
 diff --git a/mac80211.c b/mac80211.c
-index 177a47a..3e3ab10 100644
+index 63ca926..239c69b 100644
 --- a/mac80211.c
 +++ b/mac80211.c
-@@ -89,7 +89,7 @@ static void rtw_ops_stop(struct ieee80211_hw *hw, bool suspend)
- 	mutex_unlock(&rtwdev->mutex);
+@@ -107,7 +107,7 @@ static void rtw_set_tx_power(struct rtw_dev *rtwdev, int dbm)
+ 	rtw_phy_set_tx_power_level(rtwdev, hal->current_channel);
  }
  
 -#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
 +#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0) || defined(OPENWRT)
- /*
-  * Apply a TX power cap from mac80211. Must be called with rtwdev->mutex held.
-  * dbm is the effective total: mac80211 already took min(regulatory, user, ap),
+ static int rtw_ops_config(struct ieee80211_hw *hw, int radio_idx, u32 changed)
+ #else
+ static int rtw_ops_config(struct ieee80211_hw *hw, u32 changed)
 @@ -838,7 +838,7 @@ static void rtw_ops_mgd_prepare_tx(struct ieee80211_hw *hw,
  	mutex_unlock(&rtwdev->mutex);
  }
@@ -190,10 +168,28 @@ index 1d9c22d..9f0d9fd 100644
  						    tx_report.purge_timer);
  #elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
 diff --git a/usb.c b/usb.c
-index 643268c..2f13877 100644
+index 0ae0f62..a238819 100644
 --- a/usb.c
 +++ b/usb.c
-@@ -541,13 +541,13 @@ static void rtw_usb_tx_handler(struct work_struct *work)
+@@ -428,7 +428,7 @@ static int rtw_usb_write_port_sync(struct rtw_dev *rtwdev, u8 qsel,
+ 		goto out;
+ 
+ 	if (wait_for_completion_timeout(&done,
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0) || defined(OPENWRT)
+ 					secs_to_jiffies(5))) {
+ #else
+ 					msecs_to_jiffies(5000))) {
+@@ -521,7 +521,7 @@ queue:
+ 	ret = rtw_usb_write_port(rtwdev, qsel, skb_head,
+ 				 rtw_usb_write_port_tx_complete, txcb);
+ 	if (ret) {
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0) || defined(OPENWRT)
+ 		ieee80211_purge_tx_queue(rtwdev->hw, &txcb->tx_ack_queue);
+ #else
+ 		skb_queue_purge(&txcb->tx_ack_queue);
+@@ -550,13 +550,13 @@ static void rtw_usb_tx_handler(struct work_struct *work)
  
  static void rtw_usb_tx_queue_purge(struct rtw_usb *rtwusb)
  {
@@ -209,7 +205,7 @@ index 643268c..2f13877 100644
  		ieee80211_purge_tx_queue(rtwdev->hw, &rtwusb->tx_queue[i]);
  #else
  		skb_queue_purge(&rtwusb->tx_queue[i]);
-@@ -1202,11 +1202,11 @@ static void rtw_usb_deinit_tx(struct rtw_dev *rtwdev)
+@@ -1211,11 +1211,11 @@ static void rtw_usb_deinit_tx(struct rtw_dev *rtwdev)
  {
  	struct rtw_usb *rtwusb = rtw_get_usb_priv(rtwdev);
  

@@ -1,5 +1,27 @@
+diff --git a/fw.c b/fw.c
+index a15e106..21a906a 100644
+--- a/fw.c
++++ b/fw.c
+@@ -1912,7 +1912,7 @@ void rtw_fw_csa_beacon_work(struct work_struct *work)
+ 		goto out;
+ 	}
+ 
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 9, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 9, 0) || defined(OPENWRT)
+ 	if (!ieee80211_beacon_cntdwn_is_complete(vif, 0)) {
+ #else
+ 	if (!ieee80211_beacon_cntdwn_is_complete(vif)) {
+@@ -1922,7 +1922,7 @@ void rtw_fw_csa_beacon_work(struct work_struct *work)
+ 		rtw_fw_csa_queue(rtwdev, vif);
+ 	} else {
+ 		rtwdev->csa_vif = NULL;
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 9, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 9, 0) || defined(OPENWRT)
+ 		ieee80211_csa_finish(vif, 0);
+ #else
+ 		ieee80211_csa_finish(vif);
 diff --git a/mac80211.c b/mac80211.c
-index 177a47a..1888b4d 100644
+index 63ca926..1d8eed2 100644
 --- a/mac80211.c
 +++ b/mac80211.c
 @@ -76,7 +76,7 @@ static int rtw_ops_start(struct ieee80211_hw *hw)

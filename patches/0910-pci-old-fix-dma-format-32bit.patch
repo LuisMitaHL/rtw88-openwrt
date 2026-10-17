@@ -1,0 +1,29 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] wifi: rtw88: pci_old: fix %#llx on 32-bit dma_addr_t
+
+The tx-data diagnostic in rtw_pci_old_tx_isr() prints dma_addr_t values
+with %#llx. dma_addr_t is a plain u32 on 32-bit targets (e.g. OpenWrt
+23.05 mt76x8), so -Werror=format rejects that build. Cast both arguments
+to unsigned long long, as the rest of the driver does when printing
+64-bit DMA values.
+
+Downstream build fix (null SHA): pci_old.c exists only in the
+lwfinger/pkshih rtw88 trees at the pin and this diagnostic block prints
+dma_addr_t directly; the fix applies to it without dependencies.
+Note: repo-only compile fix, kept out of upstream flows; applies to the
+pinned tree ahead of (and independently of) every other patch.
+---
+diff --git a/pci_old.c b/pci_old.c
+index bb83b34..b3e2cef 100644
+--- a/pci_old.c
++++ b/pci_old.c
+@@ -352,7 +352,8 @@ static void rtw_pci_old_tx_isr(struct rtw_dev *rtwdev,
+ 		if (dma != tx_data->dma)
+ 			rtw_err(rtwdev,
+ 				"dma from tx_data %#llx != dma from tx_desc %#llx\n",
+-				tx_data->dma, dma);
++				(unsigned long long)tx_data->dma,
++				(unsigned long long)dma);
+ 
+ 		dma_unmap_single(&rtwpci->pdev->dev, dma, skb->len,
+ 				 DMA_TO_DEVICE);

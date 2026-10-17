@@ -126,7 +126,7 @@ index b387fc4..1281685 100644
 +		goto out;
 +	}
 +
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 9, 0)
 +	if (!ieee80211_beacon_cntdwn_is_complete(vif, 0)) {
 +#else
 +	if (!ieee80211_beacon_cntdwn_is_complete(vif)) {
@@ -136,7 +136,7 @@ index b387fc4..1281685 100644
 +		rtw_fw_csa_queue(rtwdev, vif);
 +	} else {
 +		rtwdev->csa_vif = NULL;
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 9, 0)
 +		ieee80211_csa_finish(vif, 0);
 +#else
 +		ieee80211_csa_finish(vif);
