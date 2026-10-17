@@ -49,13 +49,15 @@ The `patches` folder holds two kinds of patches, applied in filename order:
   - `09xx` — features maintained in this repo and not submitted upstream.
 - `999-openwrt-<version>-compat.patch` — the per-version rewrite of the `LINUX_VERSION_CODE` checks. Keep only the one matching your OpenWrt version, and keep it last: it is generated on top of the `0xxx-*.patch` files.
 
+See [`BACKPORTS.md`](BACKPORTS.md) for where every `0xxx` patch came from and its upstream status, and [`AGENTS.md`](AGENTS.md) for the rules keeping the patches and that registry in sync.
+
 You can generate your own compat patch if the rtw88 repo has been updated, or you want to test or revert some code and the provided patch does not work anymore.
 
 This only works for OpenWrt 23.05, 24.10, and 25.12 target devices.
 
 - Clone the original rtw88 repo.
 - Apply every `0xxx-*.patch` from this repo's `patches` folder to the rtw88 tree, in filename order (do **not** apply the `999-openwrt-*.patch` yet), then stage the result with `git add -A`.
-- From this repo, choose a script from `tools` for your OpenWrt version and execute it inside the rtw88 tree.
+- From this repo, choose a script from `tools` for your OpenWrt version and execute it inside the rtw88 tree. (The three scripts are generated from `tools/rtw88-patcher-openwrt.template.sh` by `tools/rtw88-patcher-sync.sh`; edit those if the rewrite logic itself needs to change.)
 - Generate the compat patch with `git diff > 999-openwrt-<version>-compat.patch` inside the rtw88 tree. Because the backports are already staged, only the script's changes end up in the diff.
 - Put the file in the "patches" folder of a local copy of this repo.
 
