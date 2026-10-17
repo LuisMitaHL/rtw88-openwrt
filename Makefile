@@ -34,7 +34,7 @@ RTW_AUTOLOAD := rtw_8821cu \
 		rtw_8821au \
 		rtw_8723du
 
-# Firmware blobs for the chips this package ships (see RTW_MODULES/AUTOLOAD).
+# Firmware blobs for the chips this package ships (see RTW_AUTOLOAD).
 # Deliberately not a wildcard: the pinned tree also carries RTL8703B firmware
 # for a chip no module here supports.
 RTW_FW:= rtw8723d_fw.bin \
@@ -91,7 +91,13 @@ EXTRA_CFLAGS:= \
 	-DCONFIG_CONCURRENT_MODE \
 	-DBUILD_OPENWRT
 
+# The pinned upstream Makefile builds rtw_pci.o (with pci_old.o), rtw_sdio.o
+# and every *e/*s chip variant whenever the target kernel has CONFIG_PCI /
+# CONFIG_MMC. None of those are shipped by this USB-only package, so force
+# both gates off and let kbuild only build what is listed in FILES.
 EXTRA_KCONFIG:= \
+	CONFIG_PCI=n \
+	CONFIG_MMC= \
 	CONFIG_RTW88-BACKPORTS-USB=m \
 	USER_MODULE_NAME=rtw88-backports-usb
 
