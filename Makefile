@@ -37,7 +37,7 @@ RTW_AUTOLOAD := rtw_8821cu \
 define KernelPackage/rtw88-backports-usb
   SUBMENU:=Wireless Drivers
   TITLE:= Realtek RTL8822CU AP Mode
-  DEPENDS:=+kmod-cfg80211 +kmod-mac80211 +kmod-usb-core +@DRIVER_11N_SUPPORT +@DRIVER_11AC_SUPPORT +@PCI_SUPPORT +rtw88-backports-firmware
+  DEPENDS:=+kmod-mac80211 +kmod-usb-core +@USB_SUPPORT +@DRIVER_11N_SUPPORT +@DRIVER_11AC_SUPPORT +rtw88-backports-firmware
   FILES:=\
 	$(PKG_BUILD_DIR)/rtw_usb.ko \
 	$(PKG_BUILD_DIR)/rtw_core.ko \
