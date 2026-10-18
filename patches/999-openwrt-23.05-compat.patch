@@ -405,7 +405,7 @@ index c6360cf..1392529 100644
  		rtwdev->ps_enabled = true;
  	} else {
 diff --git a/rx.c b/rx.c
-index 9de1a0a..e109794 100644
+index a40658b..7be6ee8 100644
 --- a/rx.c
 +++ b/rx.c
 @@ -186,7 +186,7 @@ void rtw_update_rx_freq_from_ie(struct rtw_dev *rtwdev, struct sk_buff *skb,

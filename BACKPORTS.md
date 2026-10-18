@@ -7,7 +7,7 @@ sync with `patches/` are in `AGENTS.md`.
 - Pin: `lwfinger/rtw88` `a56bcd26e` (2026-05-21), set in `Makefile` as
   `PKG_SOURCE_DATE` / `PKG_SOURCE_VERSION`. The upstream repo is dormant since.
 - Source of merged fixes: `pkshih/rtw` branch `rtw-next`, audited at head
-  `fbfa27d9b` (2026-10-10) plus a linux-wireless mailing-list sweep (2026-10-16).
+  `fbfa27d9b` (2026-10-10) plus a linux-wireless mailing-list sweep (2026-10-17).
 - Because the pin is stale, every post-pin fix must be carried here as a patch
   until the pin is bumped.
 
@@ -65,6 +65,7 @@ file and here, and flip the status to Merged.
 | `0400` usb-download-rsvd-page-synchronously | `20261013033737.6761-1-pepe.schlehofer@gmail.com` | Pending | Reserved page is downloaded synchronously (URB with completion-wait, 5 s cancel). Fixes `error beacon valid` / beacon download races — the other half of the AP stall fix (with `0100`–`0130`). **Requires `0020` first.** Acked upstream; OpenWrt is picking it (PR [#25837](https://github.com/openwrt/openwrt/pull/25837)). **Hand-adapted**: `secs_to_jiffies()` (kernel ≥ 6.13; 6.12.y stable has it) guarded at 6.13 with `msecs_to_jiffies(5000)` fallback so 23.05's 5.15 kernel compiles. |
 | `0410` 8822b-relax-etsi-edcca-2g | `20261011204509.46062-1-pepe.schlehofer@gmail.com` | Pending | 2.4 GHz ETSI EDCCA threshold `max(IGI+8, 48)` capped 50. The adapter's own USB3 energy pinned IGI low → AP invisible in scans + `failed to get tx report`. Different function than `0210`, no conflict. OpenWrt PR [#25836](https://github.com/openwrt/openwrt/pull/25836). |
 | `0420` usb-drop-rx-before-device-started | `20261016161931.18495-1-25031212351@stu.xidian.edu.cn` | Pending | Drop RX frames while `RTW_FLAG_RUNNING` is clear (frames delivered by probe-time URBs before mac80211 starts, incl. leftovers in `rx_queue` after stop). Low severity, mostly dmesg noise. v1 unreviewed. **Requires `0040` first** (same function). |
+| `0430` rx-do-not-trust-claimed-decryption | `20261017083313.56113-1-luka.gejak@linux.dev` | Pending | Only claim decryption for a frame that passed the CRC/ICV checks, and drop `RX_FLAG_DECRYPTED` for an AES frame whose CCMP header is malformed; ICV-failed frames get `RX_FLAG_FAILED_FCS_CRC` (as rtw89). Without this, one frame with a garbage CCMP header poisons mac80211's CCMP replay counter and every later genuine frame is dropped. Fixes the 8822CE A-MSDU watch item; shared `rx.c`, but the repro is PCIe (8822CE) and there is no USB reproduction, so it is carried as hardening. v1, unreviewed (no follow-ups). **Requires `0040` first** (same function; hand-adapted to the pin's 5-arg `rtw_rx_query_rx_desc()`). |
 | `0500` mac80211-program-channel-on-start | `20261007091225.413-2-jeremy.fareau@gmail.com` | Pending | M1 (2-patch series "channel and control frame filter lost on interface restart") — program the channel in `rtw_ops_start()`. Reported on RTL8814AU (a target chip), monitor mode. |
 | `0510` main-restore-control-frame-filter-on-start | `20261007091225.413-3-jeremy.fareau@gmail.com` | Pending | M1 patch 2 — restore `REG_RXFLTMAP1` in `rtw_core_start()`. Companion of `0500`. |
 | `0520` fw-download-beacon-from-rsvd-page | `20261013073010.358756-2-mehmet.fide@gmail.com` | Pending | M2 (v6 series "channel switch in AP mode") — re-download the reserved page every beacon interval to advance the CSA countdown. **Requires `0400`** (it must complete synchronously). |
@@ -99,9 +100,9 @@ file and here, and flip the status to Merged.
 - Mehmet Fide's TX-power patch (2026-09-17) — withdrawn; superseded here by `0900`.
 
 **Watch items** (bug reports with no patch posted — repro/justification material only):
-RTL8822CE hands corrupted A-MSDUs to mac80211 as hw-decrypted (2026-10-16); RTL8812BU
-does not re-enumerate after a failed USB write (2026-09-06); `WARN_ON` storm from
-`rtw_get_channel()` (2026-09-06).
+RTL8812BU does not re-enumerate after a failed USB write (2026-09-06); `WARN_ON` storm from
+`rtw_get_channel()` (2026-09-06). The RTL8822CE corrupted-A-MSDU report (2026-10-16) now
+has a patch — see `0430`.
 
 ## OpenWrt carry status (2026-10-16)
 
@@ -122,8 +123,8 @@ The only rtw88 fix OpenWrt's `package/kernel/mac80211/patches/rtl/` backports is
   `README.md` § "Generate the patch". Keep only the matching version's file when
   building.
 - Order dependencies currently in the tree:
-  `0020 → 0400`, `0040 → 0420`, `0100 → 0110 → 0120`, `0400 → 0520 → 0530`,
-  `0500` & `0510` companion, `0900` independent.
+  `0020 → 0400`, `0040 → 0420`, `0040 → 0430`, `0100 → 0110 → 0120`,
+  `0400 → 0520 → 0530`, `0500` & `0510` companion, `0900` independent.
 
 ## Re-audit pointers
 
