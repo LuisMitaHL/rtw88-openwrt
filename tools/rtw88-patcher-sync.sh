@@ -9,6 +9,16 @@
 #   24.10    6.6                               6.11               usb.c usb.h
 #   25.12    6.12                              6.17               -
 #
+# and the calls those kernels have no API for that upstream makes without a
+# check (file|function|occurrence|kernel-version|old-call|new-call, see the
+# template):
+#
+#   usb.c  rtw_usb_tx_agg_skb  ieee80211_purge_tx_queue()  added in 6.13;
+#          the 5.15/6.6/6.12 kernels have only skb_queue_purge().
+#   tx.c   rtw_tx_report_purge_timer  timer_container_of()  added in 6.16
+#          for the "struct timer_list *t" body; the 6.12 kernel still
+#          derives rtwdev with from_timer() in the "void *cntx" body.
+#
 # mac80211 backport levels are the PKG_VERSION of the mac80211 package of
 # each OpenWrt release (6.1.110 / 6.12.61 / 6.18.7 in the SDKs). The guard
 # window ends at the newest mac80211 API each release deliberately provides
@@ -23,18 +33,44 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-# version|OPENWRT_KERNEL|BACKPORT_API|SKIP_FILES
+# The call rules, one per line, paths relative to the tree top level.
+PURGE_RULE='usb.c|rtw_usb_tx_agg_skb|1|6.13.0|ieee80211_purge_tx_queue(rtwdev->hw, &txcb->tx_ack_queue);|skb_queue_purge(&txcb->tx_ack_queue);'
+TIMER_RULE='tx.c|rtw_tx_report_purge_timer|1|6.16.0|timer_container_of(rtwdev, t,|from_timer(rtwdev, t, tx_report.purge_timer);'
+
+# version|OPENWRT_KERNEL|BACKPORT_API|SKIP_FILES|calls to guard
+# The replacement goes through awk, not sed: a rule legitimately contains
+# '&' and '|', which sed would expand or treat as its delimiter.
 render() {
-	local ver=$1 kernel=$2 api=$3 skip=$4
-	out=rtw88-patcher-openwrt-$1.sh
-	sed -e "s|@OPENWRT_VERSION@|$ver|g" \
-		-e "s|@OPENWRT_KERNEL@|$kernel|g" \
-		-e "s|@BACKPORT_API@|$api|g" \
-		-e "s|@SKIP_FILES@|$skip|g" \
-		rtw88-patcher-openwrt.template.sh > "$out"
+	local ver=$1 kernel=$2 api=$3 skip=$4 rules=$5
+	local out=rtw88-patcher-openwrt-$1.sh
+	local -a exprs=(
+		"OPENWRT_VERSION@$ver" "OPENWRT_KERNEL@$kernel"
+		"BACKPORT_API@$api" "SKIP_FILES@$skip"
+		"UNGUARDED_CALLS@$rules")
+	local i
+	for i in $(seq "${#exprs[@]}"); do
+		export "RTW88_RENDER_$i=${exprs[i - 1]}"
+	done
+	awk -v n="${#exprs[@]}" '
+		BEGIN {
+			for (i = 1; i <= n; i++) {
+				s = ENVIRON["RTW88_RENDER_" i]
+				slot[substr(s, 1, index(s, "@") - 1)] = substr(s, index(s, "@") + 1)
+			}
+		}
+		{
+			for (k in slot) {
+				tag = "@" k "@"
+				while ((p = index($0, tag)) > 0)
+					$0 = substr($0, 1, p - 1) slot[k] substr($0, p + length(tag))
+			}
+			print
+		}' rtw88-patcher-openwrt.template.sh > "$out"
 	chmod +x "$out"
 }
 
-render 23.05 5.15 6.1 ''
-render 24.10 6.6 6.11 'usb.c usb.h'
-render 25.12 6.12 6.17 ''
+render 23.05 5.15 6.1 '' "$PURGE_RULE
+$TIMER_RULE"
+render 24.10 6.6 6.11 'usb.c usb.h' "$TIMER_RULE"
+render 25.12 6.12 6.17 '' "$PURGE_RULE
+$TIMER_RULE"
