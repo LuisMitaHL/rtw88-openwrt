@@ -63,8 +63,7 @@ DEFINE_ANCHOR='#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 12, 0)'
 # when the release's kernel predates kernel-version (the version the call
 # came in with); a newer kernel keeps the call untouched. A rule that
 # finds no call in its file is an error, never silence.
-UNGUARDED_CALLS='usb.c|rtw_usb_tx_agg_skb|1|6.13.0|ieee80211_purge_tx_queue(rtwdev->hw, &txcb->tx_ack_queue);|skb_queue_purge(&txcb->tx_ack_queue);
-tx.c|rtw_tx_report_purge_timer|1|6.16.0|timer_container_of(rtwdev, t,|from_timer(rtwdev, t, tx_report.purge_timer);'
+UNGUARDED_CALLS='usb.c|rtw_usb_tx_agg_skb|1|6.12.0|ieee80211_purge_tx_queue(rtwdev->hw, &txcb->tx_ack_queue);|skb_queue_purge(&txcb->tx_ack_queue);'
 
 # ------------------------------------------------------------------ helpers
 
@@ -199,7 +198,9 @@ func_body() { # file name -> "start end"
 		[ -n "$start" ] ||
 			die "$file: $name not found; FUNC_ANCHORS has no matching row"
 		case $kind in
-		F) end=$(awk -v s="$start" 'NR > s && /^[^[:space:]]/ { print NR - 1; exit }' "$file");;
+		F) end=$(awk -v s="$start" '
+			NR > s && /^[^[:space:]]/ && !/^[#{}]/ &&
+			!/^[A-Za-z_][A-Za-z0-9_]*:[[:space:]]*$/ { print NR - 1; exit }' "$file");;
 		N|I) end=$(awk -v s="$start" 'NR > s && /^#else$/ { print NR - 1; exit }' "$file");;
 		*) die "$file: unknown anchor kind '$kind' for $name";;
 		esac
@@ -221,7 +222,7 @@ apply_call_rules() { # file -> 0 when something was rewritten
 	rules=$(printf '%s\n' "$UNGUARDED_CALLS" | grep -F "$file|" || :)
 	[ -n "$rules" ] || return 1
 	while IFS= read -r rule; do
-		IFS='|' read -r func occ ver old new <<<"$rule"
+		IFS='|' read -r _ func occ ver old new <<<"$rule"
 		read -r start end < <(func_body "$file" "$func")
 		ln=$(awk -v s="$start" -v e="$end" -v o="$occ" -v c="$old" \
 			'NR >= s && NR <= e && index($0, c) && ++k == o { print NR; exit }' "$file") || :
@@ -233,12 +234,21 @@ apply_call_rules() { # file -> 0 when something was rewritten
 			log "$file:$ln: $old is in kernel $OPENWRT_KERNEL"
 			continue
 		fi
-		sed -i "${ln}s@^\([[:space:]]*\).*\$@\\
-#if LINUX_VERSION_CODE >= KERNEL_VERSION($ver)\\
-&\\
-#else\\
-\1$new\\
-#endif@" "$file"
+		# Splice the guard in with awk; a sed replacement would need & and
+		# backslash escaping in copied text.
+		awk -v ln="$ln" -v ver="$ver" -v nu="$new" '
+			NR == ln {
+			  match($0, /^[ \t]*/)
+			  ind = substr($0, 1, RLENGTH)
+			  print "#if LINUX_VERSION_CODE >= KERNEL_VERSION(" ver ")"
+			  print $0
+			  print "#else"
+			  print ind nu
+			  print "#endif"
+			  next
+			}
+			{ print }
+			' "$file" > "$file.guard" && mv "$file.guard" "$file"
 		log "guarded: $file:$ln ($old -> $new)"
 		n=$((n + 1))
 	done <<<"$rules"

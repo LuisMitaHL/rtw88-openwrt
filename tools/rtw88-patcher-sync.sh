@@ -33,8 +33,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 # The call rules, one per line, paths relative to the tree top level.
-PURGE_RULE='usb.c|rtw_usb_tx_agg_skb|1|6.13.0|ieee80211_purge_tx_queue(rtwdev->hw, &txcb->tx_ack_queue);|skb_queue_purge(&txcb->tx_ack_queue);'
-TIMER_RULE='tx.c|rtw_tx_report_purge_timer|1|6.16.0|timer_container_of(rtwdev, t,|from_timer(rtwdev, t, tx_report.purge_timer);'
+PURGE_RULE='usb.c|rtw_usb_tx_agg_skb|1|6.12.0|ieee80211_purge_tx_queue(rtwdev->hw, &txcb->tx_ack_queue);|skb_queue_purge(&txcb->tx_ack_queue);'
 
 # version|OPENWRT_KERNEL|BACKPORT_API|SKIP_FILES|calls to guard
 # The replacement goes through awk, not sed: a rule legitimately contains
@@ -68,6 +67,5 @@ render() {
 	chmod +x "$out"
 }
 
-render 24.10 6.6 6.11 'usb.c usb.h' "$TIMER_RULE"
-render 25.12 6.12 6.17 '' "$PURGE_RULE
-$TIMER_RULE"
+render 24.10 6.6 6.11 'usb.c usb.h' ''
+render 25.12 6.12 6.17 '' "$PURGE_RULE"
