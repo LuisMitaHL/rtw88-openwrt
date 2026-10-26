@@ -214,7 +214,7 @@ func_body() { # file name -> "start end"
 # itself is copied from the source verbatim, so tabs and line wrapping stay
 # byte-identical: a patch's context lines have to match the tree exactly.
 apply_call_rules() { # file -> 0 when something was rewritten
-	local file=$1 rules rule n=0
+	local file=${1#./} rules rule n=0
 	local func occ ver old new start end ln
 	[ -n "$UNGUARDED_CALLS" ] || return 1
 	rules=$(printf '%s\n' "$UNGUARDED_CALLS" | grep -F "$file|" || :)

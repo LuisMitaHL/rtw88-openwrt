@@ -5,7 +5,6 @@
 # in the table below; update the template for logic changes and re-run this.
 #
 #   version  kernel (LINUX_VERSION_CODE base)  mac80211 backport  skip files
-#   23.05    5.15                              6.1                -
 #   24.10    6.6                               6.11               usb.c usb.h
 #   25.12    6.12                              6.17               -
 #
@@ -69,8 +68,6 @@ render() {
 	chmod +x "$out"
 }
 
-render 23.05 5.15 6.1 '' "$PURGE_RULE
-$TIMER_RULE"
 render 24.10 6.6 6.11 'usb.c usb.h' "$TIMER_RULE"
 render 25.12 6.12 6.17 '' "$PURGE_RULE
 $TIMER_RULE"
