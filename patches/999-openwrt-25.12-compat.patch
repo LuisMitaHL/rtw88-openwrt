@@ -1,5 +1,27 @@
+diff --git a/fw.c b/fw.c
+index 3658a5f..820b174 100644
+--- a/fw.c
++++ b/fw.c
+@@ -1949,7 +1949,7 @@ void rtw_fw_csa_beacon_work(struct work_struct *work)
+ 		goto out;
+ 	}
+ 
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0) || defined(OPENWRT)
+ 	if (!ieee80211_beacon_cntdwn_is_complete(vif, 0)) {
+ #else
+ 	if (!ieee80211_beacon_cntdwn_is_complete(vif)) {
+@@ -1958,7 +1958,7 @@ void rtw_fw_csa_beacon_work(struct work_struct *work)
+ 		rtw_send_rsvd_page_h2c(rtwdev);
+ 		rtw_fw_csa_queue(rtwdev, vif, false);
+ 	} else {
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0) || defined(OPENWRT)
+ 		ieee80211_csa_finish(vif, 0);
+ #else
+ 		ieee80211_csa_finish(vif);
 diff --git a/mac80211.c b/mac80211.c
-index 63ca926..239c69b 100644
+index 7969041..70b908c 100644
 --- a/mac80211.c
 +++ b/mac80211.c
 @@ -107,7 +107,7 @@ static void rtw_set_tx_power(struct rtw_dev *rtwdev, int dbm)
@@ -47,7 +69,7 @@ index 63ca926..239c69b 100644
  			       int radio_idx,
  #endif
  			       u32 *tx_antenna,
-@@ -1092,14 +1092,14 @@ static int rtw_ops_set_sar_specs(struct ieee80211_hw *hw,
+@@ -1103,14 +1103,14 @@ static int rtw_ops_set_sar_specs(struct ieee80211_hw *hw,
  
  static void rtw_ops_sta_rc_update(struct ieee80211_hw *hw,
  				  struct ieee80211_vif *vif,
@@ -64,7 +86,7 @@ index 63ca926..239c69b 100644
  	struct ieee80211_sta *sta = link_sta->sta;
  #endif
  	struct rtw_dev *rtwdev = hw->priv;
-@@ -1109,7 +1109,7 @@ static void rtw_ops_sta_rc_update(struct ieee80211_hw *hw,
+@@ -1120,7 +1120,7 @@ static void rtw_ops_sta_rc_update(struct ieee80211_hw *hw,
  		ieee80211_queue_work(rtwdev->hw, &si->rc_work);
  }
  
@@ -73,7 +95,7 @@ index 63ca926..239c69b 100644
  static int rtw_ops_get_txpower(struct ieee80211_hw *hw,
  			       struct ieee80211_vif *vif,
  			       unsigned int link_id, int *dbm)
-@@ -1172,7 +1172,7 @@ const struct ieee80211_ops rtw_ops = {
+@@ -1183,7 +1183,7 @@ const struct ieee80211_ops rtw_ops = {
  	.reconfig_complete	= rtw_reconfig_complete,
  	.hw_scan		= rtw_ops_hw_scan,
  	.cancel_hw_scan		= rtw_ops_cancel_hw_scan,
@@ -83,7 +105,7 @@ index 63ca926..239c69b 100644
  #else
  	.link_sta_rc_update	= rtw_ops_sta_rc_update,
 diff --git a/main.h b/main.h
-index 123477f..9a789fd 100644
+index 54b6d3e..2939cea 100644
 --- a/main.h
 +++ b/main.h
 @@ -36,7 +36,10 @@

@@ -1,6 +1,6 @@
-From 20261013073010.358756-3-mehmet.fide@gmail.com Mon Sep 17 00:00:00 2001
+From 20261026152940.1274382-3-mehmet.fide@gmail.com Mon Sep 17 00:00:00 2001
 From: Mehmet Fide <mehmet.fide@screeningeagle.com>
-Date: Tue, 13 Oct 2026 09:30:10 +0200
+Date: Mon, 26 Oct 2026 16:29:39 +0100
 Subject: [PATCH] wifi: rtw88: support channel switch in AP mode
 
 hostapd's CHAN_SWITCH is refused because the driver does not announce
@@ -17,35 +17,73 @@ page and the work.
 The work is a delayed work of the device and csa_vif names the
 interface, both under the driver mutex. The countdown is cancelled when
 the AP stops, when the interface goes away, on WoWLAN suspend and in
-rtw_core_stop(); the BSS_CHANGED_BEACON replay after a hardware
-restart resumes it. The other page downloads during a countdown, the
-TIM update, the PG backup and the one on association, are skipped
-since every beacon fetch advances it; the next countdown download
-carries their changes. A scan is refused: it would take the AP off the
-channel its stations count down to.
+rtw_core_stop(); the BSS_CHANGED_BEACON replay after a hardware restart
+resumes it, and so does the driver after a WoWLAN resume, which mac80211
+follows with no replay. The other page downloads during a countdown, the
+TIM update, the PG backup and the one on association, are skipped until
+the beacon after the switch, since every beacon fetch advances the
+countdown; the next download carries their changes. A scan is refused:
+it would take the AP off the channel its stations count down to.
+
+The countdown downloads are queued one beacon interval apart, with no
+relation to the TBTT. A download that runs late past the next TBTT
+leaves a count out of the air.
+
+Queue each download 10 ms after the next TBTT, read from the TSF, so it
+may run late by almost a beacon interval; a later one is followed by
+the next at once. A TSF jump, an IBSS merge or a reset, restarts the
+schedule from the next TBTT.
+
+A TBTT just before the start may already have sent the first count; it
+is taken as the one that did, so no count is sent twice.
+
+The USB chips raise no TBTT interrupt, so the TSF register is read. The
+beaconing interface is always on port 0: rtw_core_port_switch() moves
+an AP there, an IBSS runs alone.
 
 Signed-off-by: Mehmet Fide <mehmet.fide@screeningeagle.com>
+Acked-by: Ping-Ke Shih <pkshih@realtek.com>
+Reviewed-by: Luka Gejak <luka.gejak@linux.dev>
 ---
-Note: not yet merged upstream (v6, still iterating). Ported from
-https://lore.kernel.org/linux-wireless/20261013073010.358756-3-mehmet.fide@gmail.com/
-Requires 0400-usb-download-rsvd-page-synchronously.patch. Two adaptations
-to the pinned tree: guard(mutex) is replaced by an explicit
-mutex_lock()/mutex_unlock() (the 5.15 kernel of OpenWrt 23.05 has no
-linux/cleanup.h), and the ieee80211_beacon_cntdwn_is_complete() and
+Note: not yet merged upstream (v9, still iterating). Bundles v9 2/3 and
+3/3, which are split upstream; they are one feature here, and 3/3 only
+reworks the pacing helper 2/3 adds. Ported from
+https://lore.kernel.org/linux-wireless/20261026152940.1274382-3-mehmet.fide@gmail.com/
+and ...-4-mehmet.fide@gmail.com/ . Requires
+0400-usb-download-rsvd-page-synchronously.patch and
+0520-fw-download-beacon-from-rsvd-page.patch.
+
+Three adaptations to the pinned tree: (1) guard(mutex)(&rtwdev->mutex) in
+rtw_ops_hw_scan() is replaced by an explicit mutex_lock()/mutex_unlock()
+with a goto out, since the 5.15 kernel of OpenWrt 23.05 has no
+linux/cleanup.h; (2) the ieee80211_beacon_cntdwn_is_complete() and
 ieee80211_csa_finish() calls are guarded at 6.14, where their link_id
-argument was added; the compat patcher resolves that per OpenWrt branch.
- fw.c       | 89 ++++++++++++++++++++++++++++++++++++++++++++++++++++--
- fw.h       |  4 +++
- mac80211.c | 55 ++++++++++++++++++++++++++++-----
- main.c     |  6 +++-
- main.h     |  3 ++
- 5 files changed, 146 insertions(+), 11 deletions(-)
+argument was added; (3) the ASSOC and BSS_CHANGED_BEACON hunks are
+rebased onto the pin's LINUX_VERSION_CODE guards around vif->cfg.assoc.
+
+Ping-Ke's Acked-by does not cover the WoWLAN resume path added in 2/3 at
+v9; expect the series to change again.
+ fw.c       | 125 ++++++++++++++++++++++++++++++++++++++++++++++++++++-
+ fw.h       |   4 ++
+ mac80211.c |  66 ++++++++++++++++++++++++++++----
+ main.c     |   6 ++-
+ main.h     |   3 ++
+ reg.h      |   1 +
+ 6 files changed, 194 insertions(+), 11 deletions(-)
 
 diff --git a/fw.c b/fw.c
-index b387fc4..1281685 100644
+index 550afca..aa88d86 100644
 --- a/fw.c
 +++ b/fw.c
-@@ -1837,14 +1837,99 @@ free:
+@@ -3,6 +3,7 @@
+  */
+ 
+ #include <linux/iopoll.h>
++#include <linux/math64.h>
+ 
+ #include "main.h"
+ #include "coex.h"
+@@ -1829,14 +1830,134 @@ free:
  	return ret;
  }
  
@@ -56,14 +94,50 @@ index b387fc4..1281685 100644
 +	return !!rtwdev->csa_vif;
 +}
 +
-+/* paced from the first download: a late one does not delay the next */
-+static void rtw_fw_csa_queue(struct rtw_dev *rtwdev, struct ieee80211_vif *vif)
++#define RTW_CSA_TBTT_MARGIN_US	10000
++
++static u64 rtw_fw_read_tsf(struct rtw_dev *rtwdev)
++{
++	u32 hi, lo, tmp;
++
++	hi = rtw_read32(rtwdev, REG_TSFTR + 4);
++	lo = rtw_read32(rtwdev, REG_TSFTR);
++	tmp = rtw_read32(rtwdev, REG_TSFTR + 4);
++	if (tmp != hi) {
++		hi = tmp;
++		lo = rtw_read32(rtwdev, REG_TSFTR);
++	}
++
++	return ((u64)hi << 32) | lo;
++}
++
++static void rtw_fw_csa_queue(struct rtw_dev *rtwdev, struct ieee80211_vif *vif,
++			     bool start)
 +{
 +	u32 interval = ieee80211_tu_to_usec(vif->bss_conf.beacon_int);
++	u64 tsf = rtw_fw_read_tsf(rtwdev);
 +	s64 delay;
++	u32 rem;
 +
-+	rtwdev->csa_due = ktime_add_us(rtwdev->csa_due, interval);
-+	delay = ktime_us_delta(rtwdev->csa_due, ktime_get());
++	if (start) {
++		div_u64_rem(tsf, interval, &rem);
++		rtwdev->csa_tbtt = tsf - rem + interval;
++		/* a TBTT just passed may have sent the first count */
++		if (rem < RTW_CSA_TBTT_MARGIN_US)
++			rtwdev->csa_tbtt -= interval;
++	} else {
++		rtwdev->csa_tbtt += interval;
++	}
++
++	delay = rtwdev->csa_tbtt + RTW_CSA_TBTT_MARGIN_US - tsf;
++	if (delay > interval + RTW_CSA_TBTT_MARGIN_US ||
++	    delay < -(s64)interval) {
++		/* the TSF jumped: restart from the next TBTT */
++		div_u64_rem(tsf, interval, &rem);
++		rtwdev->csa_tbtt = tsf - rem + interval;
++		delay = rtwdev->csa_tbtt + RTW_CSA_TBTT_MARGIN_US - tsf;
++	}
++
 +	ieee80211_queue_delayed_work(rtwdev->hw, &rtwdev->csa_beacon_work,
 +				     usecs_to_jiffies(max(delay, 0)));
 +}
@@ -76,8 +150,8 @@ index b387fc4..1281685 100644
 +		return;
 +
 +	rtwdev->csa_vif = vif;
-+	rtwdev->csa_due = ktime_get();
-+	rtw_fw_csa_queue(rtwdev, vif);
++
++	rtw_fw_csa_queue(rtwdev, vif, true);
 +}
 +
 +void rtw_fw_csa_stop(struct rtw_dev *rtwdev, struct ieee80211_vif *vif)
@@ -126,17 +200,16 @@ index b387fc4..1281685 100644
 +		goto out;
 +	}
 +
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 9, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0)
 +	if (!ieee80211_beacon_cntdwn_is_complete(vif, 0)) {
 +#else
 +	if (!ieee80211_beacon_cntdwn_is_complete(vif)) {
 +#endif
 +		rtw_fw_download_rsvd_page(rtwdev);
 +		rtw_send_rsvd_page_h2c(rtwdev);
-+		rtw_fw_csa_queue(rtwdev, vif);
++		rtw_fw_csa_queue(rtwdev, vif, false);
 +	} else {
-+		rtwdev->csa_vif = NULL;
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 9, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0)
 +		ieee80211_csa_finish(vif, 0);
 +#else
 +		ieee80211_csa_finish(vif);
@@ -164,10 +237,10 @@ index 54035ed..dfae7c3 100644
  int rtw_dump_drv_rsvd_page(struct rtw_dev *rtwdev,
  			   u32 offset, u32 size, u32 *buf);
 diff --git a/mac80211.c b/mac80211.c
-index d31dbb2..73da0e3 100644
+index 07ec50d..9f939ac 100644
 --- a/mac80211.c
 +++ b/mac80211.c
-@@ -258,6 +258,8 @@ static void rtw_ops_remove_interface(struct ieee80211_hw *hw,
+@@ -247,6 +247,8 @@ static void rtw_ops_remove_interface(struct ieee80211_hw *hw,
  
  	mutex_lock(&rtwdev->mutex);
  
@@ -176,7 +249,7 @@ index d31dbb2..73da0e3 100644
  	rtw_leave_lps_deep(rtwdev);
  
  	rtw_txq_cleanup(rtwdev, vif->txq);
-@@ -424,8 +426,12 @@ static void rtw_ops_bss_info_changed(struct ieee80211_hw *hw,
+@@ -412,8 +414,12 @@ static void rtw_ops_bss_info_changed(struct ieee80211_hw *hw,
  		if (conf->assoc) {
  #endif
  			rtw_coex_connect_notify(rtwdev, COEX_ASSOCIATE_FINISH);
@@ -191,7 +264,7 @@ index d31dbb2..73da0e3 100644
  			rtw_fw_default_port(rtwdev, rtwvif);
  #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0))
  			rtw_coex_media_status_notify(rtwdev, vif->cfg.assoc);
-@@ -471,6 +477,11 @@ static void rtw_ops_bss_info_changed(struct ieee80211_hw *hw,
+@@ -459,6 +465,11 @@ static void rtw_ops_bss_info_changed(struct ieee80211_hw *hw,
  		rtw_set_dtim_period(rtwdev, conf->dtim_period);
  		rtw_fw_download_rsvd_page(rtwdev);
  		rtw_send_rsvd_page_h2c(rtwdev);
@@ -203,7 +276,7 @@ index d31dbb2..73da0e3 100644
  	}
  
  	if (changed & BSS_CHANGED_BEACON_ENABLED) {
-@@ -532,6 +543,7 @@ static void rtw_ops_stop_ap(struct ieee80211_hw *hw,
+@@ -520,6 +531,7 @@ static void rtw_ops_stop_ap(struct ieee80211_hw *hw,
  	struct rtw_dev *rtwdev = hw->priv;
  
  	mutex_lock(&rtwdev->mutex);
@@ -211,7 +284,7 @@ index d31dbb2..73da0e3 100644
  	rtw_write32_clr(rtwdev, REG_TCR, BIT_TCR_UPDATE_HGQMD);
  	rtw_write16(rtwdev, REG_ATIMWND, ATIMWND_DEFAULT);
  	rtwdev->ap_active = false;
-@@ -602,6 +614,17 @@ static int rtw_ops_set_tim(struct ieee80211_hw *hw, struct ieee80211_sta *sta,
+@@ -590,6 +602,17 @@ static int rtw_ops_set_tim(struct ieee80211_hw *hw, struct ieee80211_sta *sta,
  	return 0;
  }
  
@@ -229,7 +302,7 @@ index d31dbb2..73da0e3 100644
  static int rtw_ops_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
  			   struct ieee80211_vif *vif, struct ieee80211_sta *sta,
  			   struct ieee80211_key_conf *key)
-@@ -672,7 +695,8 @@ static int rtw_ops_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
+@@ -660,7 +683,8 @@ static int rtw_ops_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
  	}
  
  	/* download new cam settings for PG to backup */
@@ -239,7 +312,7 @@ index d31dbb2..73da0e3 100644
  		rtw_fw_download_rsvd_page(rtwdev);
  
  out:
-@@ -933,6 +957,7 @@ static int rtw_ops_suspend(struct ieee80211_hw *hw,
+@@ -921,6 +945,7 @@ static int rtw_ops_suspend(struct ieee80211_hw *hw,
  	int ret;
  
  	mutex_lock(&rtwdev->mutex);
@@ -247,7 +320,32 @@ index d31dbb2..73da0e3 100644
  	ret = rtw_wow_suspend(rtwdev, wowlan);
  	if (ret)
  		rtw_err(rtwdev, "failed to suspend for wow %d\n", ret);
-@@ -980,19 +1005,32 @@ static int rtw_ops_hw_scan(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
+@@ -929,6 +954,15 @@ static int rtw_ops_suspend(struct ieee80211_hw *hw,
+ 	return ret ? 1 : 0;
+ }
+ 
++static void rtw_ops_csa_resume_iter(void *data, struct ieee80211_vif *vif)
++{
++	struct rtw_dev *rtwdev = data;
++
++	if ((vif->type == NL80211_IFTYPE_AP ||
++	     vif->type == NL80211_IFTYPE_ADHOC) && vif->bss_conf.csa_active)
++		rtw_fw_csa_start(rtwdev, vif);
++}
++
+ static int rtw_ops_resume(struct ieee80211_hw *hw)
+ {
+ 	struct rtw_dev *rtwdev = hw->priv;
+@@ -938,6 +972,8 @@ static int rtw_ops_resume(struct ieee80211_hw *hw)
+ 	ret = rtw_wow_resume(rtwdev);
+ 	if (ret)
+ 		rtw_err(rtwdev, "failed to resume for wow %d\n", ret);
++	else
++		rtw_iterate_vifs(rtwdev, rtw_ops_csa_resume_iter, rtwdev);
+ 	mutex_unlock(&rtwdev->mutex);
+ 
+ 	return ret ? 1 : 0;
+@@ -968,19 +1004,32 @@ static int rtw_ops_hw_scan(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
  	struct rtw_dev *rtwdev = hw->priv;
  	int ret;
  
@@ -285,7 +383,7 @@ index d31dbb2..73da0e3 100644
  	mutex_unlock(&rtwdev->mutex);
  
  	return ret;
-@@ -1070,6 +1108,7 @@ const struct ieee80211_ops rtw_ops = {
+@@ -1058,6 +1107,7 @@ const struct ieee80211_ops rtw_ops = {
  	.sta_add		= rtw_ops_sta_add,
  	.sta_remove		= rtw_ops_sta_remove,
  	.set_tim		= rtw_ops_set_tim,
@@ -294,10 +392,10 @@ index d31dbb2..73da0e3 100644
  	.ampdu_action		= rtw_ops_ampdu_action,
  #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 20, 0)
 diff --git a/main.c b/main.c
-index 716fbf2..d856ddf 100644
+index da9667f..dc35ab9 100644
 --- a/main.c
 +++ b/main.c
-@@ -1653,11 +1653,13 @@ void rtw_core_stop(struct rtw_dev *rtwdev)
+@@ -1645,11 +1645,13 @@ void rtw_core_stop(struct rtw_dev *rtwdev)
  
  	clear_bit(RTW_FLAG_RUNNING, rtwdev->flags);
  	clear_bit(RTW_FLAG_FW_RUNNING, rtwdev->flags);
@@ -311,7 +409,7 @@ index 716fbf2..d856ddf 100644
  	cancel_delayed_work_sync(&rtwdev->watch_dog_work);
  	cancel_delayed_work_sync(&coex->bt_relink_work);
  	cancel_delayed_work_sync(&coex->bt_reenable_work);
-@@ -2291,6 +2293,7 @@ int rtw_core_init(struct rtw_dev *rtwdev)
+@@ -2283,6 +2285,7 @@ int rtw_core_init(struct rtw_dev *rtwdev)
  	INIT_WORK(&rtwdev->ips_work, rtw_ips_work);
  	INIT_WORK(&rtwdev->fw_recovery_work, rtw_fw_recovery_work);
  	INIT_WORK(&rtwdev->update_beacon_work, rtw_fw_update_beacon_work);
@@ -319,7 +417,7 @@ index 716fbf2..d856ddf 100644
  	INIT_WORK(&rtwdev->ba_work, rtw_txq_ba_work);
  	skb_queue_head_init(&rtwdev->c2h_queue);
  	skb_queue_head_init(&rtwdev->coex.queue);
-@@ -2420,7 +2423,8 @@ int rtw_register_hw(struct rtw_dev *rtwdev, struct ieee80211_hw *hw)
+@@ -2412,7 +2415,8 @@ int rtw_register_hw(struct rtw_dev *rtwdev, struct ieee80211_hw *hw)
  	hw->wiphy->available_antennas_rx = hal->antenna_rx;
  
  	hw->wiphy->flags |= WIPHY_FLAG_SUPPORTS_TDLS |
@@ -330,7 +428,7 @@ index 716fbf2..d856ddf 100644
  	hw->wiphy->features |= NL80211_FEATURE_SCAN_RANDOM_MAC_ADDR;
  	hw->wiphy->max_scan_ssids = RTW_SCAN_MAX_SSIDS;
 diff --git a/main.h b/main.h
-index e5375d2..ae7b14a 100644
+index 1f18827..941b36b 100644
 --- a/main.h
 +++ b/main.h
 @@ -2246,6 +2246,9 @@ struct rtw_dev {
@@ -339,10 +437,22 @@ index e5375d2..ae7b14a 100644
  	struct work_struct update_beacon_work;
 +	struct delayed_work csa_beacon_work;
 +	struct ieee80211_vif *csa_vif;
-+	ktime_t csa_due;
++	u64 csa_tbtt;
  
  	/* used to protect txqs list */
  	spinlock_t txq_lock;
--- 
-2.56.0
+diff --git a/reg.h b/reg.h
+index b406d07..54c206c 100644
+--- a/reg.h
++++ b/reg.h
+@@ -509,6 +509,7 @@
+ #define REG_USTIME_TSF		0x055C
+ #define REG_BCN_MAX_ERR		0x055D
+ #define REG_RXTSF_OFFSET_CCK	0x055E
++#define REG_TSFTR		0x0560
+ #define REG_MISC_CTRL		0x0577
+ #define BIT_EN_FREE_CNT		BIT(3)
+ #define BIT_DIS_SECOND_CCA	(BIT(0) | BIT(1))
 
+-- 
+2.55.0

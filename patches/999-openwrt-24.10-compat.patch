@@ -1,27 +1,5 @@
-diff --git a/fw.c b/fw.c
-index a15e106..21a906a 100644
---- a/fw.c
-+++ b/fw.c
-@@ -1912,7 +1912,7 @@ void rtw_fw_csa_beacon_work(struct work_struct *work)
- 		goto out;
- 	}
- 
--#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 9, 0)
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 9, 0) || defined(OPENWRT)
- 	if (!ieee80211_beacon_cntdwn_is_complete(vif, 0)) {
- #else
- 	if (!ieee80211_beacon_cntdwn_is_complete(vif)) {
-@@ -1922,7 +1922,7 @@ void rtw_fw_csa_beacon_work(struct work_struct *work)
- 		rtw_fw_csa_queue(rtwdev, vif);
- 	} else {
- 		rtwdev->csa_vif = NULL;
--#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 9, 0)
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 9, 0) || defined(OPENWRT)
- 		ieee80211_csa_finish(vif, 0);
- #else
- 		ieee80211_csa_finish(vif);
 diff --git a/mac80211.c b/mac80211.c
-index 63ca926..1d8eed2 100644
+index 7969041..8dbe845 100644
 --- a/mac80211.c
 +++ b/mac80211.c
 @@ -76,7 +76,7 @@ static int rtw_ops_start(struct ieee80211_hw *hw)
@@ -33,7 +11,7 @@ index 63ca926..1d8eed2 100644
  static void rtw_ops_stop(struct ieee80211_hw *hw)
  #else
  static void rtw_ops_stop(struct ieee80211_hw *hw, bool suspend)
-@@ -1131,7 +1131,7 @@ static int rtw_ops_get_txpower(struct ieee80211_hw *hw,
+@@ -1142,7 +1142,7 @@ static int rtw_ops_get_txpower(struct ieee80211_hw *hw,
  }
  
  const struct ieee80211_ops rtw_ops = {
@@ -43,7 +21,7 @@ index 63ca926..1d8eed2 100644
  	.remove_chanctx = ieee80211_emulate_remove_chanctx,
  	.change_chanctx = ieee80211_emulate_change_chanctx,
 diff --git a/main.h b/main.h
-index 123477f..553acf1 100644
+index 54b6d3e..9cb139e 100644
 --- a/main.h
 +++ b/main.h
 @@ -36,6 +36,9 @@

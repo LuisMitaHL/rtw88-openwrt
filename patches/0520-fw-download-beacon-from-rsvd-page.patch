@@ -1,6 +1,6 @@
-From 20261013073010.358756-2-mehmet.fide@gmail.com Mon Sep 17 00:00:00 2001
+From 20261026152940.1274382-2-mehmet.fide@gmail.com Mon Sep 17 00:00:00 2001
 From: Mehmet Fide <mehmet.fide@screeningeagle.com>
-Date: Tue, 13 Oct 2026 09:30:09 +0200
+Date: Mon, 26 Oct 2026 16:29:38 +0100
 Subject: [PATCH] wifi: rtw88: download the beacon the reserved page was built
  with
 
@@ -21,18 +21,18 @@ Signed-off-by: Mehmet Fide <mehmet.fide@screeningeagle.com>
 Reviewed-by: Luka Gejak <luka.gejak@linux.dev>
 Acked-by: Ping-Ke Shih <pkshih@realtek.com>
 ---
-Note: not yet merged upstream (v6 series "channel switch in AP mode").
-Ported from the series cover
-https://lore.kernel.org/linux-wireless/20261013073010.358756-1-mehmet.fide@gmail.com/
+Note: not yet merged upstream (v9 series "channel switch in AP mode").
+Ported from
+https://lore.kernel.org/linux-wireless/20261026152940.1274382-2-mehmet.fide@gmail.com/
 No stable upstream hash yet. 0530 depends on this patch.
  fw.c | 34 +++++++++++++++++++++-------------
  1 file changed, 21 insertions(+), 13 deletions(-)
 
-diff --git a/fw.c b/fw.c
-index 550afca..b387fc4 100644
+diff --git a/drivers/net/wireless/realtek/rtw88/fw.c b/drivers/net/wireless/realtek/rtw88/fw.c
+index 0000000..0000000 100644
 --- a/fw.c
 +++ b/fw.c
-@@ -1657,7 +1657,8 @@ static int  __rtw_build_rsvd_page_from_vifs(struct rtw_dev *rtwdev)
+@@ -1622,7 +1622,8 @@ static int  __rtw_build_rsvd_page_from_vifs(struct rtw_dev *rtwdev)
  	return 0;
  }
  
@@ -42,7 +42,7 @@ index 550afca..b387fc4 100644
  {
  	const struct rtw_chip_info *chip = rtwdev->chip;
  	struct ieee80211_hw *hw = rtwdev->hw;
-@@ -1737,13 +1738,15 @@ static u8 *rtw_build_rsvd_page(struct rtw_dev *rtwdev, u32 *size)
+@@ -1702,13 +1703,15 @@ static u8 *rtw_build_rsvd_page(struct rtw_dev *rtwdev, u32 *size)
  	list_for_each_entry(rsvd_pkt, &rtwdev->rsvd_page_list, build_list) {
  		rtw_rsvd_page_list_to_buf(rtwdev, page_size, page_margin,
  					  page, buf, rsvd_pkt);
@@ -62,7 +62,7 @@ index 550afca..b387fc4 100644
  		rsvd_pkt->skb = NULL;
  	}
  
-@@ -1758,11 +1761,12 @@ release_skb:
+@@ -1723,11 +1726,12 @@ static u8 *rtw_build_rsvd_page(struct rtw_dev *rtwdev, u32 *size)
  	return NULL;
  }
  
@@ -77,7 +77,7 @@ index 550afca..b387fc4 100644
  	int ret = 0;
  
  	rsvd_pkt = list_first_entry_or_null(&rtwdev->rsvd_page_list,
-@@ -1779,7 +1783,8 @@ static int rtw_download_beacon(struct rtw_dev *rtwdev)
+@@ -1744,7 +1748,8 @@ static int rtw_download_beacon(struct rtw_dev *rtwdev)
  		return -EINVAL;
  	}
  
@@ -87,7 +87,7 @@ index 550afca..b387fc4 100644
  	if (!skb) {
  		rtw_err(rtwdev, "failed to get beacon skb\n");
  		return -ENOMEM;
-@@ -1789,18 +1794,20 @@ static int rtw_download_beacon(struct rtw_dev *rtwdev)
+@@ -1754,18 +1759,20 @@ static int rtw_download_beacon(struct rtw_dev *rtwdev)
  	if (ret)
  		rtw_err(rtwdev, "failed to download drv rsvd page\n");
  
@@ -111,7 +111,7 @@ index 550afca..b387fc4 100644
  	if (!buf) {
  		rtw_err(rtwdev, "failed to build rsvd page pkt\n");
  		return -ENOMEM;
-@@ -1817,13 +1824,14 @@ int rtw_fw_download_rsvd_page(struct rtw_dev *rtwdev)
+@@ -1782,13 +1789,14 @@ int rtw_fw_download_rsvd_page(struct rtw_dev *rtwdev)
  	 * the beacon again to replace the TX desc header, and we will get
  	 * a correct tx_desc for the beacon in the rsvd page.
  	 */
@@ -127,7 +127,7 @@ index 550afca..b387fc4 100644
  	kfree(buf);
  
  	return ret;
-@@ -2380,7 +2388,7 @@ int rtw_hw_scan_offload(struct rtw_dev *rtwdev, struct ieee80211_vif *vif,
+@@ -2345,7 +2353,7 @@ int rtw_hw_scan_offload(struct rtw_dev *rtwdev, struct ieee80211_vif *vif,
  	rtw_fw_set_scan_offload(rtwdev, &cs_option, rtwvif, &chan_list);
  out:
  	if (rtwdev->ap_active) {
@@ -136,6 +136,6 @@ index 550afca..b387fc4 100644
  		if (ret)
  			rtw_err(rtwdev, "HW scan download beacon failed\n");
  	}
--- 
-2.56.0
 
+-- 
+2.55.0
