@@ -191,7 +191,7 @@ index fd0762c..fce23df 100644
  						    tx_report.purge_timer);
  #elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
 diff --git a/usb.c b/usb.c
-index 4e17c2e..535ad6b 100644
+index 0028a77..95051b9 100644
 --- a/usb.c
 +++ b/usb.c
 @@ -428,7 +428,7 @@ static int rtw_usb_write_port_sync(struct rtw_dev *rtwdev, u8 qsel,
@@ -219,7 +219,7 @@ index 4e17c2e..535ad6b 100644
  		ieee80211_purge_tx_queue(rtwdev->hw, &rtwusb->tx_queue[i]);
  #else
  		skb_queue_purge(&rtwusb->tx_queue[i]);
-@@ -1207,11 +1207,11 @@ static void rtw_usb_deinit_tx(struct rtw_dev *rtwdev)
+@@ -1204,11 +1204,11 @@ static void rtw_usb_deinit_tx(struct rtw_dev *rtwdev)
  {
  	struct rtw_usb *rtwusb = rtw_get_usb_priv(rtwdev);
  

@@ -1,4 +1,4 @@
-From 20261013033737.6761-1-pepe.schlehofer@gmail.com Mon Sep 17 00:00:00 2001
+From a0756232e960accd076760a8b3b5403f7e1d9d47 Mon Sep 17 00:00:00 2001
 From: Mohammed Afifi <i.mafifi17@gmail.com>
 Date: Tue, 13 Oct 2026 05:37:37 +0200
 Subject: [PATCH] wifi: rtw88: usb: Download the reserved page synchronously
@@ -46,14 +46,12 @@ Signed-off-by: Mohammed Afifi <i.mafifi17@gmail.com>
 Signed-off-by: Bitterblue Smith <rtl8821cerfe2@gmail.com>
 Co-developed-by: Josef Schlehofer <pepe.schlehofer@gmail.com>
 Signed-off-by: Josef Schlehofer <pepe.schlehofer@gmail.com>
+Acked-by: Ping-Ke Shih <pkshih@realtek.com>
+Signed-off-by: Ping-Ke Shih <pkshih@realtek.com>
+Link: https://patch.msgid.link/20261013033737.6761-1-pepe.schlehofer@gmail.com
 ---
-Note: not yet merged upstream (submitted as v5 to rtw-next). Ported from
-https://lore.kernel.org/linux-wireless/20261013033737.6761-1-pepe.schlehofer@gmail.com/
-and carried by OpenWrt PR #25837. No stable upstream hash yet.
-Requires 0020-usb-fix-memory-leaks-on-write-failure.patch: this patch's
-base is that hunk.
- usb.c | 66 +++++++++++++++++++++++++++++++++++++++++++++++++++--------
- 1 file changed, 58 insertions(+), 8 deletions(-)
+ usb.c | 71 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 63 insertions(+), 8 deletions(-)
 
 diff --git a/usb.c b/usb.c
 index de0a73f..cc68f5e 100644
@@ -175,4 +173,3 @@ index de0a73f..cc68f5e 100644
  static bool rtw_usb_bmc_needs_dtim(struct sk_buff *skb)
 -- 
 2.56.0
-

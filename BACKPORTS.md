@@ -7,8 +7,8 @@ sync with `patches/` are in `AGENTS.md`.
 - Pin: `lwfinger/rtw88` `f1dd7c3a5` (2026-10-24), set in `Makefile` as
   `PKG_SOURCE_DATE` / `PKG_SOURCE_VERSION`.
 - Source of merged fixes: `pkshih/rtw` branch `rtw-next`, audited at head
-  `9b0be45d4` ("Merge tag wireless-next-2026-10-15") plus a linux-wireless
-  mailing-list sweep (2026-10-31).
+  `04c998418` ("pci: Add DMI quirk for HP Laptop 15s-fr5xxx") plus a
+  linux-wireless mailing-list sweep (2026-11-08).
 - Supported OpenWrt targets: 24.10 (Linux 6.6) and 25.12 (Linux 6.12). 23.05
   (Linux 5.15) was dropped with the `f1dd7c3a5` pin bump.
 - Every post-pin fix must be carried here as a patch until the next pin bump.
@@ -21,14 +21,14 @@ sync with `patches/` are in `AGENTS.md`.
 - **Downstream-only** — first line is the null SHA `00000000...`; the patch
   header says it is not an upstream backport.
 
-The pin now contains every commit previously carried as a `Merged` backport, so
-that status is currently unused. It returns, as `From <upstream SHA>`, when a
-commit merged into `rtw-next` after `fbfa27d9b` has to be carried against this pin.
+The pin contains every commit previously carried as a `Merged` backport. That
+status is in use again: `0400`, `0410` and `0420` were merged into `rtw-next`
+after the pin and are carried as `From <upstream SHA>` until the next bump.
 
 ## Status legend
 
 - **Merged** — picked into `rtw-next`; absent from the pin, so carried here
-  until the pin is bumped. No such patch at the `f1dd7c3a5` pin.
+  until the pin is bumped.
 - **Pending** — submitted to linux-wireless, not merged upstream; the
   Message-ID is the identity until an upstream commit exists.
 - **Downstream** — repo-only feature; never submitted upstream.
@@ -36,6 +36,17 @@ commit merged into `rtw-next` after `fbfa27d9b` has to be carried against this p
 Only these three statuses exist. The section "Not carried" lists reviewed
 upstream work rejected on purpose (Superseded / Withdrawn / wrong-subsystem /
 already in the pin) — those never get a patch file.
+
+## Merged (in rtw-next, absent from the pin)
+
+Identified by the upstream commit SHA in the patch's first line. Drop the row
+and the patch file at the next pin bump if the new pin contains the commit.
+
+| Patch | Upstream commit | Status | Notes |
+|---|---|---|---|
+| `0400` usb-download-rsvd-page-synchronously | [`a0756232e`](https://github.com/pkshih/rtw/commit/a0756232e) | Merged | Reserved page is downloaded synchronously (URB with completion-wait, 5 s cancel). Fixes `error beacon valid` / beacon download races. OpenWrt is picking it up (PR [#25837](https://github.com/openwrt/openwrt/pull/25837)). **Hand-adapted**: `secs_to_jiffies()` guarded at 6.13 with a `msecs_to_jiffies(5000)` fallback — the only difference from the merged commit, and both remaining kernels (6.6, 6.12) take the fallback branch. **Base for `0520`**. |
+| `0410` 8822b-relax-etsi-edcca-2g | [`b0435910e`](https://github.com/pkshih/rtw/commit/b0435910e) | Merged | 2.4 GHz ETSI EDCCA threshold `max(IGI+8, 48)` capped 50. The adapter's own USB3 energy pinned IGI low → AP invisible in scans + `failed to get tx report`. Different function than the 8822B RF-path fix now in the pin, no conflict. Merged content is byte-identical, so only the `From` line changed. |
+| `0420` usb-drop-rx-before-device-started | [`72fa55807`](https://github.com/pkshih/rtw/commit/72fa55807) | Merged | Drop RX frames while `RTW_FLAG_RUNNING` is clear (frames delivered by probe-time URBs before mac80211 starts, incl. leftovers in `rx_queue` after stop). Low severity, mostly dmesg noise. **Merged as v2**: the carried form used a trailing `else if (test_bit(...))`; upstream took the earlier `if (!test_bit(...)) { dev_kfree_skb_any(skb); goto skip_packet; }` and the patch now follows it. Relies on the descriptor validation now in the pin (same function). |
 
 ## Pending upstream (not merged; Message-ID is the identity)
 
@@ -45,9 +56,6 @@ file and here, and flip the status to Merged.
 
 | Patch | Upstream Message-ID | Status | Notes |
 |---|---|---|---|
-| `0400` usb-download-rsvd-page-synchronously | `20261013033737.6761-1-pepe.schlehofer@gmail.com` | Pending | Reserved page is downloaded synchronously (URB with completion-wait, 5 s cancel). Fixes `error beacon valid` / beacon download races. Acked upstream; OpenWrt is picking it (PR [#25837](https://github.com/openwrt/openwrt/pull/25837)). **Hand-adapted**: `secs_to_jiffies()` guarded at 6.13 with a `msecs_to_jiffies(5000)` fallback. **Base for `0520`**; no longer requires the old USB write-failure fix (now in the pin). |
-| `0410` 8822b-relax-etsi-edcca-2g | `20261011204509.46062-1-pepe.schlehofer@gmail.com` | Pending | 2.4 GHz ETSI EDCCA threshold `max(IGI+8, 48)` capped 50. The adapter's own USB3 energy pinned IGI low → AP invisible in scans + `failed to get tx report`. Different function than the 8822B RF-path fix now in the pin, no conflict. OpenWrt PR [#25836](https://github.com/openwrt/openwrt/pull/25836). |
-| `0420` usb-drop-rx-before-device-started | `20261016161931.18495-1-25031212351@stu.xidian.edu.cn` | Pending | Drop RX frames while `RTW_FLAG_RUNNING` is clear (frames delivered by probe-time URBs before mac80211 starts, incl. leftovers in `rx_queue` after stop). Low severity, mostly dmesg noise. v1 unreviewed. Relies on the descriptor validation now in the pin (same function). |
 | `0430` rx-do-not-trust-claimed-decryption | `20261017083313.56113-1-luka.gejak@linux.dev` | Pending | Only claim decryption for a frame that passed the CRC/ICV checks, and drop `RX_FLAG_DECRYPTED` for an AES frame whose CCMP header is malformed; ICV-failed frames get `RX_FLAG_FAILED_FCS_CRC` (as rtw89). Without this, one frame with a garbage CCMP header poisons mac80211's CCMP replay counter and every later genuine frame is dropped. Fixes the 8822CE A-MSDU watch item; shared `rx.c`, but the repro is PCIe (8822CE) and there is no USB reproduction, so it is carried as hardening. v1, unreviewed (no follow-ups). Same function as the descriptor validation now in the pin; the old hand-adaptation for the pre-bump 5-arg `rtw_rx_query_rx_desc()` no longer applies, so re-verify on a bump. |
 | `0500` mac80211-program-channel-on-start | `20261007091225.413-2-jeremy.fareau@gmail.com` | Pending | M1 (2-patch series "channel and control frame filter lost on interface restart") — program the channel in `rtw_ops_start()`. Reported on RTL8814AU (a target chip), monitor mode. |
 | `0510` main-restore-control-frame-filter-on-start | `20261007091225.413-3-jeremy.fareau@gmail.com` | Pending | M1 patch 2 — restore `REG_RXFLTMAP1` in `rtw_core_start()`. Companion of `0500`. |
