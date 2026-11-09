@@ -28,8 +28,8 @@ No stable upstream hash yet. 0530 depends on this patch.
  fw.c | 34 +++++++++++++++++++++-------------
  1 file changed, 21 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/net/wireless/realtek/rtw88/fw.c b/drivers/net/wireless/realtek/rtw88/fw.c
-index 0000000..0000000 100644
+diff --git a/fw.c b/fw.c
+index 550afca..b387fc4 100644
 --- a/fw.c
 +++ b/fw.c
 @@ -1622,7 +1622,8 @@ static int  __rtw_build_rsvd_page_from_vifs(struct rtw_dev *rtwdev)
